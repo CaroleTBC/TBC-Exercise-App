@@ -11,7 +11,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
-      if (session?.user) fetchProfile(session.user.id);
+      if (session?.user) fetchProfile(session.user.id, session.access_token);
       else setLoading(false);
     });
 
@@ -19,7 +19,7 @@ export function AuthProvider({ children }) {
       async (_event, session) => {
         setUser(session?.user ?? null);
         if (session?.user) {
-          await fetchProfile(session.user.id);
+          await fetchProfile(session.user.id, session.access_token);
         } else {
           setProfile(null);
           setLoading(false);
@@ -30,14 +30,29 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  async function fetchProfile(userId) {
+  async function fetchProfile(userId, accessToken) {
     try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-      setProfile(data);
+      const res = await fetch(
+        `${process.env.REACT_APP_SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=*`,
+        {
+          headers: {
+            'apikey': process.env.REACT_APP_SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+          }
+        }
+      );
+
+      if (!res.ok) {
+        console.error('Profile fetch failed:', res.status, await res.text());
+        setLoading(false);
+        return;
+      }
+
+      const data = await res.json();
+      setProfile(data?.[0] ?? null);
+    } catch (err) {
+      console.error('Profile fetch error:', err);
     } finally {
       setLoading(false);
     }
