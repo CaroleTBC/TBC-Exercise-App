@@ -12,12 +12,15 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 });
 
 export const EXERCISE_CATEGORIES = [
-  'Balance & Stability',
-  'Hip Strength',
-  'Lower Body Strength',
-  'Mobility & Flexibility',
-  'Posture & Alignment',
-  'Shoulder & Upper Body',
-  'Spinal Health',
-  'Weight-Bearing & Impact',
+  'strength',
+  'impact',
+  'spinal',
+  'balance',
 ];
+
+export const CATEGORY_LABELS = {
+  strength: 'Strength & Loading',
+  impact: 'Impact & Bone Loading',
+  spinal: 'Posture & Spinal Strength',
+  balance: 'Balance & Fall Prevention',
+};
