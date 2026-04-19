@@ -7,41 +7,51 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  console.log('Function called:', req.method)
+  
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
+    console.log('Checking auth header')
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
+      console.log('No auth header found')
       return new Response(JSON.stringify({ error: 'No auth header' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    console.log('Creating admin client')
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    console.log('URL exists:', !!supabaseUrl, 'Key exists:', !!serviceKey)
 
-    // Verify the user exists using the token
+    const supabaseAdmin = createClient(supabaseUrl ?? '', serviceKey ?? '')
+
+    console.log('Verifying token')
     const token = authHeader.replace('Bearer ', '')
     const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token)
     
     if (userError || !user) {
+      console.log('Token error:', userError?.message)
       return new Response(JSON.stringify({ error: 'Invalid token' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    // Check role directly using admin client
+    console.log('User verified:', user.id)
+
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single()
+
+    console.log('Profile role:', profile?.role)
 
     if (!profile || profile.role !== 'therapist') {
       return new Response(JSON.stringify({ error: 'Not authorised' }), {
@@ -50,7 +60,9 @@ serve(async (req) => {
       })
     }
 
+    console.log('Parsing request body')
     const { full_name, email, phone, date_of_birth } = await req.json()
+    console.log('Adding client:', email)
 
     if (!full_name || !email) {
       return new Response(JSON.stringify({ error: 'Name and email required' }), {
@@ -59,7 +71,6 @@ serve(async (req) => {
       })
     }
 
-    // Check if profile already exists
     const { data: existingProfile } = await supabaseAdmin
       .from('profiles')
       .select('id')
@@ -76,53 +87,11 @@ serve(async (req) => {
       })
     }
 
-    // Invite user via Supabase Auth
+    console.log('Inviting user')
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       data: { full_name }
     })
 
     if (inviteError) {
-      return new Response(JSON.stringify({ error: inviteError.message }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
-    // Create profile immediately so exercises can be assigned
-    const { data: newProfile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .insert({
-        id: inviteData.user.id,
-        full_name,
-        email,
-        role: 'client',
-        phone: phone || null,
-        date_of_birth: date_of_birth || null,
-        gdpr_consent: false,
-        gdpr_consent_date: null
-      })
-      .select()
-      .single()
-
-    if (profileError) {
-      return new Response(JSON.stringify({ error: profileError.message }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
-    return new Response(JSON.stringify({ 
-      success: true,
-      message: 'Client invited successfully',
-      profile_id: newProfile.id
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
-
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
-  }
-})
+      console.log('Invite error:', inviteError.message)
+      return
