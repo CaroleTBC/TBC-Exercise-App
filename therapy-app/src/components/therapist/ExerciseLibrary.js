@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { supabase, EXERCISE_CATEGORIES } from '../../lib/supabase';
+import { supabase, EXERCISE_CATEGORIES, CATEGORY_LABELS } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import VideoPlayer from '../shared/VideoPlayer';
 import {
