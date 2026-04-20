@@ -95,9 +95,9 @@ function AppRoutes() {
   const [needsPassword, setNeedsPassword] = useState(false);
 
   useEffect(() => {
-    // Detect invite link — Supabase adds #access_token to URL
     const hash = window.location.hash;
-    if (hash.includes('access_token') && hash.includes('type=invite')) {
+    if (hash.includes('access_token') && 
+       (hash.includes('type=invite') || hash.includes('type=recovery'))) {
       setNeedsPassword(true);
     }
   }, []);
