@@ -2,6 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import ComplianceTracker from '../client/ComplianceTracker';
+// ⚠️ IMPORTANT: Do NOT remove or edit the lucide-react import below.
+// Removing it breaks the entire therapist portal with "Can't find variable: UserPlus"
+// This has happened twice. Every time this file is edited, check this line is still here.
+import {
+  UserPlus, X, ChevronRight, Plus, Trash2,
+  Save, CheckCircle2, BarChart2, BookOpen,
+  AlertCircle, Search
+} from 'lucide-react';
 import { renderMarkdown } from './InformationLibrary';
 
 const SUPABASE_URL = 'https://wysbbhrolgyzjkwwzpyy.supabase.co';
