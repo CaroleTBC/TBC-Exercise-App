@@ -46,16 +46,14 @@ export default function LoginPage() {
 
   return (
     <div style={styles.page}>
-      <div style={styles.background} />
-
+      <div style={styles.backgroundGradient} />
+      <div style={styles.backgroundLogo} />
       <div style={styles.container}>
         <div style={styles.card}>
           {/* Header */}
           <div style={styles.header}>
             <div style={styles.logoMark}>
-              <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                <circle cx="16" cy="16" r="15" stroke="#c47a5a" strokeWidth="2"/>
-                <path d="M10 16 Q16 8 22 16 Q16 24 10 16Z" fill="#2f456f" opacity="0.8"/>
+                <img src="/logo.jpg" alt="Therapy by Carole" style={styles.logoImg} />
               </svg>
             </div>
             <h1 style={styles.title}>Therapy by Carole</h1>
@@ -223,13 +221,23 @@ const styles = {
     padding: '1rem',
     background: 'var(--cream)',
   },
-  background: {
+  backgroundGradient: {
+  position: 'fixed',
+  inset: 0,
+  background: `
+    radial-gradient(ellipse 60% 50% at 20% 20%, rgba(47,69,111,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 80% 80%, rgba(196,122,90,0.1) 0%, transparent 60%)
+  `,
+  zIndex: 0,
+  },
+  backgroundLogo: {
     position: 'fixed',
     inset: 0,
-    background: `
-      radial-gradient(ellipse 60% 50% at 20% 20%, rgba(47,69,111,0.12) 0%, transparent 60%),
-      radial-gradient(ellipse 50% 40% at 80% 80%, rgba(196,122,90,0.1) 0%, transparent 60%)
-    `,
+    backgroundImage: 'url(/logo.jpg)',
+    backgroundSize: '500px',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+    opacity: 0.05,
     zIndex: 0,
   },
   container: {
@@ -251,9 +259,14 @@ const styles = {
     textAlign: 'center',
   },
   logoMark: {
-    display: 'flex',
-    justifyContent: 'center',
-    marginBottom: '0.75rem',
+  display: 'flex',
+  justifyContent: 'center',
+  marginBottom: '0.75rem',
+  },
+  logoImg: {
+    width: '120px',
+    height: 'auto',
+    borderRadius: 'var(--radius-md)',
   },
   title: {
     color: 'var(--cream)',
