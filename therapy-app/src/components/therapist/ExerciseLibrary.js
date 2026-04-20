@@ -4,8 +4,10 @@ import { useAuth } from '../../hooks/useAuth';
 import VideoPlayer from '../shared/VideoPlayer';
 import {
   Plus, Sparkles, Search, ChevronDown, ChevronUp,
-  Edit2, Trash2, X, Save, Check, Info
+  Edit2, Trash2, X, Save, Info
 } from 'lucide-react';
+
+const SUPABASE_URL = 'https://wysbbhrolgyzjkwwzpyy.supabase.co';
 
 export default function ExerciseLibrary({ onStatsChange }) {
   const { profile } = useAuth();
@@ -19,6 +21,7 @@ export default function ExerciseLibrary({ onStatsChange }) {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
   const [showAiPanel, setShowAiPanel] = useState(false);
+  const [aiError, setAiError] = useState('');
 
   useEffect(() => {
     fetchExercises();
@@ -47,7 +50,6 @@ export default function ExerciseLibrary({ onStatsChange }) {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [exercises, search, activeCategory]);
 
-  // Group by category for display
   const grouped = useMemo(() => {
     if (activeCategory !== 'All') return { [activeCategory]: filtered };
     const g = {};
@@ -68,37 +70,30 @@ export default function ExerciseLibrary({ onStatsChange }) {
   async function generateWithAI() {
     if (!aiPrompt.trim()) return;
     setAiLoading(true);
+    setAiError('');
 
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          messages: [{
-            role: 'user',
-            content: `You are an expert in strength and conditioning, specialising in exercises for people with osteoporosis, bone health, and general rehabilitation. Generate an exercise based on this request: "${aiPrompt}"
+      const { data: { session } } = await supabase.auth.getSession();
 
-Return ONLY valid JSON in this exact format, no other text:
-{
-  "name": "Exercise Name",
-  "category": "one of: strength, impact, spinal, balance",
-  "description": "Clear step-by-step instructions. Include starting position, movement, key technique points, and any safety cues for someone with osteoporosis.",
-  "default_sets": 3,
-  "default_reps": "10",
-  "default_hold_seconds": null,
-  "default_rest_seconds": 60,
-  "therapist_notes_template": "A brief note for the therapist about progressions, regressions, or contraindications."
-}`
-          }]
-        })
-      });
+      const response = await fetch(
+        `${SUPABASE_URL}/functions/v1/generate-exercise`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ prompt: aiPrompt }),
+        }
+      );
 
-      const data = await response.json();
-      const text = data.content?.[0]?.text || '';
-      const clean = text.replace(/```json|```/g, '').trim();
-      const generated = JSON.parse(clean);
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Generation failed');
+      }
+
+      const generated = result.exercise;
 
       setEditingExercise({
         ...generated,
@@ -106,10 +101,12 @@ Return ONLY valid JSON in this exact format, no other text:
         video_url: '',
         video_type: 'youtube',
       });
+      setAiPrompt('');
       setShowAiPanel(false);
       setShowAddModal(true);
+
     } catch (err) {
-      alert('AI generation failed. Please try again or add the exercise manually.');
+      setAiError(err.message || 'Something went wrong. Try again or add the exercise manually.');
     } finally {
       setAiLoading(false);
     }
@@ -181,7 +178,7 @@ Return ONLY valid JSON in this exact format, no other text:
         </div>
         <div style={styles.headerActions}>
           <button
-            onClick={() => setShowAiPanel(v => !v)}
+            onClick={() => { setShowAiPanel(v => !v); setAiError(''); }}
             className="btn"
             style={styles.aiBtn}
           >
@@ -200,7 +197,11 @@ Return ONLY valid JSON in this exact format, no other text:
           <div style={styles.aiPanelHeader}>
             <Sparkles size={16} color="var(--terracotta)" />
             <span style={styles.aiPanelTitle}>Generate an exercise with AI</span>
-            <button onClick={() => setShowAiPanel(false)} className="btn btn-ghost" style={{ marginLeft: 'auto', padding: '0.25rem' }}>
+            <button
+              onClick={() => { setShowAiPanel(false); setAiError(''); }}
+              className="btn btn-ghost"
+              style={{ marginLeft: 'auto', padding: '0.25rem' }}
+            >
               <X size={16} />
             </button>
           </div>
@@ -214,7 +215,8 @@ Return ONLY valid JSON in this exact format, no other text:
               value={aiPrompt}
               onChange={e => setAiPrompt(e.target.value)}
               placeholder="e.g. single leg balance exercise suitable for osteoporosis, progressable from wall support"
-              onKeyDown={e => e.key === 'Enter' && generateWithAI()}
+              onKeyDown={e => e.key === 'Enter' && !aiLoading && generateWithAI()}
+              disabled={aiLoading}
             />
             <button
               onClick={generateWithAI}
@@ -222,10 +224,15 @@ Return ONLY valid JSON in this exact format, no other text:
               disabled={aiLoading || !aiPrompt.trim()}
               style={{ flexShrink: 0 }}
             >
-              {aiLoading ? <span className="spinner" style={{ width: '1rem', height: '1rem', borderWidth: '2px' }} /> : <Sparkles size={15} />}
+              {aiLoading
+                ? <span className="spinner" style={{ width: '1rem', height: '1rem', borderWidth: '2px' }} />
+                : <Sparkles size={15} />}
               {aiLoading ? 'Generating...' : 'Generate'}
             </button>
           </div>
+          {aiError && (
+            <p style={styles.aiErrorMsg}>{aiError}</p>
+          )}
         </div>
       )}
 
@@ -312,7 +319,9 @@ Return ONLY valid JSON in this exact format, no other text:
                           >
                             <Trash2 size={14} />
                           </button>
-                          {isExpanded ? <ChevronUp size={16} color="var(--navy)" /> : <ChevronDown size={16} color="var(--navy)" />}
+                          {isExpanded
+                            ? <ChevronUp size={16} color="var(--navy)" />
+                            : <ChevronDown size={16} color="var(--navy)" />}
                         </div>
                       </button>
 
@@ -357,6 +366,9 @@ Return ONLY valid JSON in this exact format, no other text:
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ExerciseFormModal — unchanged from original
+// ─────────────────────────────────────────────────────────────────────────────
 function ExerciseFormModal({ exercise, onSave, onClose }) {
   const [form, setForm] = useState({ ...exercise });
   const [saving, setSaving] = useState(false);
@@ -455,9 +467,12 @@ function ExerciseFormModal({ exercise, onSave, onClose }) {
               className="form-textarea"
               value={form.description}
               onChange={e => set('description', e.target.value)}
-              rows={5}
-              placeholder="Step-by-step instructions including starting position, movement, and key technique points..."
+              rows={8}
+              placeholder={`Brief intro paragraph.\n\nHOW TO DO IT:\n1. First step.\n2. Second step.\n\nSAFETY: Safety guidance.`}
             />
+            <p style={{ fontSize: '0.72rem', color: 'var(--charcoal)', opacity: 0.5, marginTop: '0.3rem' }}>
+              Use the format above — intro paragraph, HOW TO DO IT: with numbered steps, then SAFETY: — so the client view displays each step in its own box.
+            </p>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0 0.75rem' }}>
@@ -504,7 +519,9 @@ function ExerciseFormModal({ exercise, onSave, onClose }) {
             disabled={saving}
             style={{ gap: '0.5rem' }}
           >
-            {saving ? <span className="spinner" style={{ width: '1rem', height: '1rem', borderWidth: '2px' }} /> : <Save size={15} />}
+            {saving
+              ? <span className="spinner" style={{ width: '1rem', height: '1rem', borderWidth: '2px' }} />
+              : <Save size={15} />}
             {saving ? 'Saving...' : exercise.id ? 'Save changes' : 'Add to library'}
           </button>
         </div>
@@ -575,6 +592,15 @@ const styles = {
   aiInputRow: {
     display: 'flex',
     gap: '0.75rem',
+  },
+  aiErrorMsg: {
+    marginTop: '0.65rem',
+    fontSize: '0.82rem',
+    color: 'var(--danger)',
+    background: 'rgba(220,53,69,0.06)',
+    border: '1px solid rgba(220,53,69,0.2)',
+    borderRadius: 'var(--radius-sm)',
+    padding: '0.5rem 0.75rem',
   },
   filterBar: {
     display: 'flex',
@@ -698,6 +724,7 @@ const styles = {
     color: 'var(--charcoal)',
     marginBottom: '0.75rem',
     marginTop: '0.75rem',
+    whiteSpace: 'pre-wrap',
   },
   paramRow: {
     display: 'flex',
