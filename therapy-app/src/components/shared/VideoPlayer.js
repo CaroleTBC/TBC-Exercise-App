@@ -1,22 +1,30 @@
 import React, { useState } from 'react';
 import { Play } from 'lucide-react';
 
+function getYouTubeId(url) {
+  try {
+    const u = new URL(url);
+    // youtu.be/ID
+    if (u.hostname.includes('youtu.be')) return u.pathname.slice(1).split('?')[0];
+    // youtube.com/shorts/ID
+    if (u.pathname.startsWith('/shorts/')) return u.pathname.split('/shorts/')[1].split('?')[0];
+    // youtube.com/watch?v=ID
+    return u.searchParams.get('v') || '';
+  } catch {
+    const match = url.match(/(?:v=|youtu\.be\/|shorts\/)([^&?\s/]+)/);
+    return match ? match[1] : '';
+  }
+}
+
+function isShorts(url) {
+  return url.includes('/shorts/');
+}
+
 function getEmbedUrl(url, type) {
   if (!url) return null;
 
   if (type === 'youtube' || url.includes('youtube.com') || url.includes('youtu.be')) {
-    let id = '';
-    try {
-      const u = new URL(url);
-      if (u.hostname.includes('youtu.be')) {
-        id = u.pathname.slice(1);
-      } else {
-        id = u.searchParams.get('v');
-      }
-    } catch {
-      const match = url.match(/(?:v=|youtu\.be\/)([^&\s]+)/);
-      id = match ? match[1] : '';
-    }
+    const id = getYouTubeId(url);
     return id ? `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1` : null;
   }
 
@@ -36,24 +44,16 @@ export default function VideoPlayer({ url, type, title }) {
 
   if (!url || !embedUrl) return null;
 
-  // Thumbnail for YouTube (performance: lazy load iframe)
   const isYoutube = type === 'youtube' || url.includes('youtube') || url.includes('youtu.be');
-  let thumbId = '';
-  if (isYoutube) {
-    try {
-      const u = new URL(url);
-      thumbId = u.hostname.includes('youtu.be')
-        ? u.pathname.slice(1)
-        : u.searchParams.get('v');
-    } catch {
-      const m = url.match(/(?:v=|youtu\.be\/)([^&\s]+)/);
-      thumbId = m ? m[1] : '';
-    }
-  }
+  const portrait = isYoutube && isShorts(url);
+  const thumbId = isYoutube ? getYouTubeId(url) : '';
+
+  // 16:9 for regular videos, 9:16 for Shorts
+  const paddingBottom = portrait ? '177.78%' : '56.25%';
 
   return (
     <div style={styles.container}>
-      <div style={styles.aspectBox}>
+      <div style={{ ...styles.aspectBox, paddingBottom }}>
         {!activated && isYoutube && thumbId ? (
           <button
             style={styles.thumbnail}
@@ -63,7 +63,10 @@ export default function VideoPlayer({ url, type, title }) {
             <img
               src={`https://img.youtube.com/vi/${thumbId}/hqdefault.jpg`}
               alt={title || 'Video thumbnail'}
-              style={styles.thumbImg}
+              style={{
+                ...styles.thumbImg,
+                objectPosition: portrait ? 'center' : 'center',
+              }}
               loading="lazy"
             />
             <div style={styles.playOverlay}>
@@ -80,7 +83,7 @@ export default function VideoPlayer({ url, type, title }) {
               </div>
             )}
             <iframe
-              src={activated ? embedUrl : embedUrl}
+              src={embedUrl}
               title={title || 'Exercise video'}
               frameBorder="0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -108,7 +111,6 @@ const styles = {
   },
   aspectBox: {
     position: 'relative',
-    paddingBottom: '56.25%', // 16:9 default
     height: 0,
     overflow: 'hidden',
   },
