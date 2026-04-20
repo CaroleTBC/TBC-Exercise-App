@@ -10,6 +10,7 @@ import {
   Info, Calendar, CheckCircle2, AlertTriangle, Play
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { renderMarkdown } from '../therapist/InformationLibrary';
 
 const TABS = [
   { id: 'exercises', label: 'Exercises', icon: Dumbbell },
@@ -521,15 +522,7 @@ export default function ClientDashboard() {
                   );
                 })}
 
-                {/* Sticky log button */}
-                <button
-                  onClick={() => setShowLogModal(true)}
-                  className="btn btn-secondary"
-                  style={styles.logFloatBtn}
-                >
-                  <BarChart2 size={16} />
-                  {anyLogged ? 'Review & save today\'s session' : 'Log today\'s session'}
-                </button>
+
               </div>
             )}
           </div>
@@ -552,9 +545,7 @@ export default function ClientDashboard() {
                       <div style={styles.infoCategory}>{item.category}</div>
                       <h3 style={styles.infoTitle}>{item.title}</h3>
                       <div style={styles.infoText}>
-                        {item.content.split('\n').map((para, i) =>
-                          para.trim() ? <p key={i}>{para}</p> : <br key={i} />
-                        )}
+                        {renderMarkdown(item.content)}
                       </div>
                       <div style={styles.infoDate}>
                         {new Date(item.updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
