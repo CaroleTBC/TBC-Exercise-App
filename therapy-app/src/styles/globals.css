@@ -502,3 +502,21 @@ img { max-width: 100%; height: auto; display: block; }
   .th-mobile-bar { display: flex !important; }
   .th-mobile-tabs { display: flex !important; }
 }
+/* ─── FADED LOGO BACKGROUND FOR APP ─── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url('/logo.jpg');
+  background-size: 500px;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0.04;
+  z-index: 0;
+  pointer-events: none;
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+}
