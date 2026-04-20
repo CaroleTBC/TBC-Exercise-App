@@ -2,11 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import ComplianceTracker from '../client/ComplianceTracker';
-import {
-  UserPlus, X, ChevronRight, ChevronDown, Plus, Trash2,
-  Save, Eye, CheckCircle2, Circle, BarChart2, BookOpen,
-  AlertCircle, Search
-} from 'lucide-react';
+import { renderMarkdown } from './InformationLibrary';
+
+const SUPABASE_URL = 'https://wysbbhrolgyzjkwwzpyy.supabase.co';
 
 export default function ClientManager({ onStatsChange }) {
   const { profile } = useAuth();
@@ -164,6 +162,8 @@ function ClientDetail({ client, therapistId, onBack, activeTab, setActiveTab }) 
   const [loading, setLoading] = useState(true);
   const [showAddExercise, setShowAddExercise] = useState(false);
   const [showAddInfo, setShowAddInfo] = useState(false);
+  const [libraryArticles, setLibraryArticles] = useState([]);
+  const [showArticlePicker, setShowArticlePicker] = useState(false);
 
   const CLIENT_TABS = [
     { id: 'programme', label: 'Programme', icon: CheckCircle2 },
@@ -203,7 +203,7 @@ function ClientDetail({ client, therapistId, onBack, activeTab, setActiveTab }) 
 
       setProgramme(prog);
 
-      const [{ data: progExs }, { data: exLib }, { data: info }] = await Promise.all([
+      const [{ data: progExs }, { data: exLib }, { data: info }, { data: artLib }] = await Promise.all([
         supabase
           .from('programme_exercises')
           .select('*, exercise:exercises(*)')
@@ -217,11 +217,13 @@ function ClientDetail({ client, therapistId, onBack, activeTab, setActiveTab }) 
           .eq('client_id', client.id)
           .order('is_pinned', { ascending: false })
           .order('created_at', { ascending: false }),
+        supabase.from('information_articles').select('*').order('title'),
       ]);
 
       setProgrammeExercises(progExs || []);
       setAllExercises(exLib || []);
       setInformation(info || []);
+      setLibraryArticles(artLib || []);
     } finally {
       setLoading(false);
     }
@@ -268,8 +270,28 @@ function ClientDetail({ client, therapistId, onBack, activeTab, setActiveTab }) 
     setShowAddInfo(false);
   }
 
-  async function deleteInfo(id) {
-    if (!window.confirm('Delete this information item?')) return;
+  async function assignArticle(article) {
+    const already = information.some(i => i.article_id === article.id);
+    if (already) { alert('This article is already assigned to this client.'); return; }
+    const { data } = await supabase
+      .from('client_information')
+      .insert({
+        client_id: client.id,
+        therapist_id: therapistId,
+        article_id: article.id,
+        title: article.title,
+        content: article.content,
+        category: article.category,
+        is_pinned: false,
+      })
+      .select()
+      .single();
+    setInformation(prev => [data, ...prev]);
+    setShowArticlePicker(false);
+  }
+
+  async function removeInfo(id) {
+    if (!window.confirm('Remove this article from the client?')) return;
     await supabase.from('client_information').delete().eq('id', id);
     setInformation(prev => prev.filter(i => i.id !== id));
   }
@@ -355,41 +377,51 @@ function ClientDetail({ client, therapistId, onBack, activeTab, setActiveTab }) 
       {activeTab === 'information' && (
         <div style={styles.tabContent} className="fade-in">
           <div style={styles.tabActionBar}>
-            <h3 style={{ margin: 0, fontSize: '1rem' }}>Client Information</h3>
+            <h3 style={{ margin: 0, fontSize: '1rem' }}>Information Articles</h3>
             <button
-              onClick={() => setShowAddInfo(true)}
+              onClick={() => setShowArticlePicker(true)}
               className="btn btn-primary"
               style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
             >
-              <Plus size={14} /> Add Article
+              <Plus size={14} /> Add from Library
             </button>
           </div>
 
-          {information.map(item => (
-            <div key={item.id} className="card" style={{ marginBottom: '1rem', overflow: 'hidden' }}>
-              {item.is_pinned && <div style={styles.pinnedBar}>📌 Pinned</div>}
-              <div style={{ padding: '1rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <div style={styles.infoCategory}>{item.category}</div>
-                    <h4 style={{ fontSize: '1rem', margin: '0.25rem 0' }}>{item.title}</h4>
-                  </div>
-                  <button onClick={() => deleteInfo(item.id)} className="btn btn-ghost" style={{ color: 'var(--danger)', padding: '0.3rem' }}>
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-                <p style={{ fontSize: '0.875rem', color: 'var(--charcoal)', opacity: 0.7, marginTop: '0.5rem', lineHeight: 1.6 }}>
-                  {item.content.length > 200 ? item.content.substring(0, 200) + '...' : item.content}
-                </p>
-              </div>
-            </div>
-          ))}
-
-          {information.length === 0 && (
+          {information.length === 0 ? (
             <div className="empty-state">
               <BookOpen size={36} opacity={0.3} />
-              <p>No information articles yet.</p>
+              <p>No articles assigned yet.<br />Add from the Information Library.</p>
             </div>
+          ) : (
+            information.map(item => (
+              <div key={item.id} className="card" style={{ marginBottom: '1rem', overflow: 'hidden' }}>
+                {item.is_pinned && <div style={styles.pinnedBar}>📌 Pinned</div>}
+                <div style={{ padding: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <div style={styles.infoCategory}>{item.category}</div>
+                      <h4 style={{ fontSize: '1rem', margin: '0.25rem 0' }}>{item.title}</h4>
+                    </div>
+                    <button onClick={() => removeInfo(item.id)} className="btn btn-ghost" style={{ color: 'var(--danger)', padding: '0.3rem' }}>
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                  <div style={{ fontSize: '0.875rem', color: 'var(--charcoal)', opacity: 0.7, marginTop: '0.5rem' }}>
+                    {renderMarkdown(item.content.slice(0, 300) + (item.content.length > 300 ? '...' : ''))}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+
+          {/* Article picker modal */}
+          {showArticlePicker && (
+            <ArticlePickerModal
+              articles={libraryArticles}
+              assignedArticleIds={information.map(i => i.article_id).filter(Boolean)}
+              onAssign={assignArticle}
+              onClose={() => setShowArticlePicker(false)}
+            />
           )}
         </div>
       )}
@@ -417,13 +449,6 @@ function ClientDetail({ client, therapistId, onBack, activeTab, setActiveTab }) 
           assignedIds={programmeExercises.map(pe => pe.exercise_id)}
           onAdd={addExercise}
           onClose={() => setShowAddExercise(false)}
-        />
-      )}
-
-      {showAddInfo && (
-        <AddInfoModal
-          onAdd={addInformation}
-          onClose={() => setShowAddInfo(false)}
         />
       )}
     </div>
@@ -685,55 +710,60 @@ function AddExerciseModal({ allExercises, assignedIds, onAdd, onClose }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AddInfoModal — unchanged
+// ArticlePickerModal — browse library and assign to this client
 // ─────────────────────────────────────────────────────────────────────────────
-function AddInfoModal({ onAdd, onClose }) {
-  const [form, setForm] = useState({ title: '', content: '', category: 'General', is_pinned: false });
-  const categories = ['General', 'Osteoporosis', 'Exercise Tips', 'Home Care', 'Nutrition', 'Lifestyle'];
+function ArticlePickerModal({ articles, assignedArticleIds, onAssign, onClose }) {
+  const [search, setSearch] = useState('');
+
+  const available = articles.filter(a =>
+    !assignedArticleIds.includes(a.id) &&
+    (!search || a.title.toLowerCase().includes(search.toLowerCase()) || a.category.toLowerCase().includes(search.toLowerCase()))
+  );
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-content">
+      <div className="modal-content" style={{ maxWidth: '540px' }}>
         <div className="modal-header">
           <h2 style={{ fontSize: '1.2rem' }}>Add Information Article</h2>
           <button onClick={onClose} className="btn btn-ghost" style={{ padding: '0.4rem' }}><X size={20} /></button>
         </div>
         <div className="modal-body">
-          <div className="form-group">
-            <label className="form-label">Title</label>
-            <input type="text" className="form-input" value={form.title}
-              onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Understanding Osteoporosis" />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0 0.75rem', alignItems: 'end' }}>
-            <div className="form-group">
-              <label className="form-label">Category</label>
-              <select className="form-select" value={form.category}
-                onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
-                {categories.map(c => <option key={c}>{c}</option>)}
-              </select>
+          <input type="search" className="form-input" placeholder="Search articles..."
+            value={search} onChange={e => setSearch(e.target.value)} style={{ marginBottom: '0.75rem' }} />
+
+          {available.length === 0 ? (
+            <p style={{ textAlign: 'center', opacity: 0.5, fontSize: '0.875rem', padding: '1.5rem' }}>
+              {articles.length === 0
+                ? 'No articles in the library yet. Add some in the Information Library.'
+                : 'All available articles are already assigned to this client.'}
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', maxHeight: '350px', overflowY: 'auto' }}>
+              {available.map(article => (
+                <button
+                  key={article.id}
+                  onClick={() => onAssign(article)}
+                  style={{
+                    display: 'flex', alignItems: 'flex-start', gap: '0.75rem',
+                    padding: '0.75rem', borderRadius: 'var(--radius-sm)',
+                    border: '1.5px solid var(--cream-dark)', background: 'transparent',
+                    cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--cream)'; e.currentTarget.style.borderColor = 'var(--navy)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'var(--cream-dark)'; }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 500, fontSize: '0.9rem', color: 'var(--navy)', marginBottom: '0.2rem' }}>{article.title}</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--terracotta)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{article.category}</div>
+                  </div>
+                  <Plus size={16} color="var(--navy)" style={{ opacity: 0.4, flexShrink: 0, marginTop: '0.2rem' }} />
+                </button>
+              ))}
             </div>
-            <div className="form-group">
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginBottom: '0.35rem' }}>
-                <input type="checkbox" checked={form.is_pinned}
-                  onChange={e => setForm(f => ({ ...f, is_pinned: e.target.checked }))}
-                  style={{ accentColor: 'var(--navy)', width: '16px', height: '16px' }} />
-                <span style={{ fontSize: '0.85rem', color: 'var(--navy)' }}>Pin to top</span>
-              </label>
-            </div>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Content</label>
-            <textarea className="form-textarea" rows={8} value={form.content}
-              onChange={e => setForm(f => ({ ...f, content: e.target.value }))}
-              placeholder="Write your article or notes here..." />
-          </div>
+          )}
         </div>
         <div className="modal-footer">
-          <button onClick={onClose} className="btn btn-ghost">Cancel</button>
-          <button onClick={() => onAdd(form)} className="btn btn-primary"
-            disabled={!form.title.trim() || !form.content.trim()}>
-            <Save size={15} /> Add
-          </button>
+          <button onClick={onClose} className="btn btn-ghost">Close</button>
         </div>
       </div>
     </div>
