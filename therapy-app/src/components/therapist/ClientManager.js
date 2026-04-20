@@ -2,6 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import ComplianceTracker from '../client/ComplianceTracker';
+import {
+  UserPlus, X, ChevronRight, ChevronDown, Plus, Trash2,
+  Save, Eye, CheckCircle2, Circle, BarChart2, BookOpen,
+  AlertCircle, Search
+} from 'lucide-react';
 import { renderMarkdown } from './InformationLibrary';
 
 const SUPABASE_URL = 'https://wysbbhrolgyzjkwwzpyy.supabase.co';
