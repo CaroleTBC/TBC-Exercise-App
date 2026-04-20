@@ -89,7 +89,8 @@ serve(async (req) => {
 
     console.log('Inviting user')
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-      data: { full_name }
+      data: { full_name },
+      redirectTo: 'https://tbcxerciseapp.netlify.app'
     })
 
     if (inviteError) {
