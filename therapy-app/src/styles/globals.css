@@ -507,7 +507,7 @@ body::before {
   content: '';
   position: fixed;
   inset: 0;
-  background-image: url('/logo.jpg');
+  background-image: url('../../public/logo.jpg');
   background-size: 500px;
   background-position: center;
   background-repeat: no-repeat;
