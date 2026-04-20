@@ -54,7 +54,6 @@ export default function LoginPage() {
           <div style={styles.header}>
             <div style={styles.logoMark}>
                 <img src="/logo.jpg" alt="Therapy by Carole" style={styles.logoImg} />
-              </svg>
             </div>
             <h1 style={styles.title}>Therapy by Carole</h1>
             <p style={styles.subtitle}>
