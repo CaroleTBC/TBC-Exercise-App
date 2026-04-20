@@ -2,11 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import ComplianceTracker from '../client/ComplianceTracker';
-import {
-  UserPlus, X, ChevronRight, ChevronDown, Plus, Trash2,
-  Save, Eye, CheckCircle2, Circle, BarChart2, BookOpen,
-  AlertCircle, Search
-} from 'lucide-react';
 import { renderMarkdown } from './InformationLibrary';
 
 const SUPABASE_URL = 'https://wysbbhrolgyzjkwwzpyy.supabase.co';
@@ -70,6 +65,34 @@ export default function ClientManager({ onStatsChange }) {
     }
   }
 
+  async function resendInvite(e, client) {
+    e.stopPropagation();
+    if (!window.confirm(`Resend invite email to ${client.email}?`)) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(
+        'https://wysbbhrolgyzjkwwzpyy.supabase.co/functions/v1/invite-client',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            email: client.email,
+            full_name: client.full_name,
+            resend: true,
+          })
+        }
+      );
+      const result = await response.json();
+      if (!response.ok) { alert(`Could not resend: ${result.error}`); return; }
+      alert(`Invite resent to ${client.email}`);
+    } catch (err) {
+      alert(`Something went wrong: ${err.message}`);
+    }
+  }
+
   const filteredClients = clients.filter(c =>
     !search || c.full_name.toLowerCase().includes(search.toLowerCase()) ||
     c.email.toLowerCase().includes(search.toLowerCase())
@@ -117,21 +140,40 @@ export default function ClientManager({ onStatsChange }) {
           ) : (
             <div style={styles.clientList}>
               {filteredClients.map(client => (
-                <button
+                <div
                   key={client.id}
-                  onClick={() => setSelectedClient(client)}
                   className="card"
-                  style={styles.clientCard}
+                  style={{ ...styles.clientCard, cursor: 'default' }}
                 >
-                  <div style={styles.clientAvatar}>
-                    {client.full_name?.charAt(0)}
+                  <button
+                    onClick={() => setSelectedClient(client)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}
+                  >
+                    <div style={styles.clientAvatar}>
+                      {client.full_name?.charAt(0)}
+                    </div>
+                    <div style={styles.clientInfo}>
+                      <span style={styles.clientName}>{client.full_name}</span>
+                      <span style={styles.clientEmail}>{client.email}</span>
+                    </div>
+                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <button
+                      onClick={e => resendInvite(e, client)}
+                      className="btn btn-ghost"
+                      style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem', color: 'var(--terracotta)', border: '1px solid var(--terracotta)', borderRadius: 'var(--radius-sm)', whiteSpace: 'nowrap' }}
+                      title="Resend invite email"
+                    >
+                      Resend invite
+                    </button>
+                    <button
+                      onClick={() => setSelectedClient(client)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem', display: 'flex' }}
+                    >
+                      <ChevronRight size={18} color="var(--navy)" opacity={0.4} />
+                    </button>
                   </div>
-                  <div style={styles.clientInfo}>
-                    <span style={styles.clientName}>{client.full_name}</span>
-                    <span style={styles.clientEmail}>{client.email}</span>
-                  </div>
-                  <ChevronRight size={18} color="var(--navy)" opacity={0.4} />
-                </button>
+                </div>
               ))}
             </div>
           )}
