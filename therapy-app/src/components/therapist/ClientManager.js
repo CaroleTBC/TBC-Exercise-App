@@ -31,7 +31,7 @@ export default function ClientManager({ onStatsChange }) {
     setLoading(false);
   }
 
-async function createClient(form) {
+  async function createClient(form) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
 
@@ -83,7 +83,6 @@ async function createClient(form) {
   return (
     <div style={styles.page}>
       {!selectedClient ? (
-        // Client list
         <div>
           <div style={styles.pageHeader}>
             <div>
@@ -135,7 +134,6 @@ async function createClient(form) {
           )}
         </div>
       ) : (
-        // Client detail
         <ClientDetail
           client={selectedClient}
           therapistId={profile.id}
@@ -155,6 +153,9 @@ async function createClient(form) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ClientDetail
+// ─────────────────────────────────────────────────────────────────────────────
 function ClientDetail({ client, therapistId, onBack, activeTab, setActiveTab }) {
   const [programme, setProgramme] = useState(null);
   const [allExercises, setAllExercises] = useState([]);
@@ -188,7 +189,6 @@ function ClientDetail({ client, therapistId, onBack, activeTab, setActiveTab }) 
       let prog = programmes?.[0];
 
       if (!prog) {
-        // Auto-create programme
         const { data: newProg } = await supabase
           .from('client_programmes')
           .insert({
@@ -284,7 +284,6 @@ function ClientDetail({ client, therapistId, onBack, activeTab, setActiveTab }) 
 
   return (
     <div>
-      {/* Client header */}
       <div style={styles.clientDetailHeader}>
         <button onClick={onBack} className="btn btn-ghost" style={{ padding: '0.4rem' }}>
           ← Back
@@ -298,7 +297,6 @@ function ClientDetail({ client, therapistId, onBack, activeTab, setActiveTab }) 
         </div>
       </div>
 
-      {/* Tabs */}
       <div style={styles.clientTabs}>
         {CLIENT_TABS.map(tab => {
           const Icon = tab.icon;
@@ -322,9 +320,7 @@ function ClientDetail({ client, therapistId, onBack, activeTab, setActiveTab }) 
       {activeTab === 'programme' && (
         <div style={styles.tabContent} className="fade-in">
           <div style={styles.tabActionBar}>
-            <h3 style={{ margin: 0, fontSize: '1rem' }}>
-              {programme?.name}
-            </h3>
+            <h3 style={{ margin: 0, fontSize: '1rem' }}>{programme?.name}</h3>
             <button
               onClick={() => setShowAddExercise(true)}
               className="btn btn-primary"
@@ -415,7 +411,6 @@ function ClientDetail({ client, therapistId, onBack, activeTab, setActiveTab }) 
         </div>
       )}
 
-      {/* Modals */}
       {showAddExercise && (
         <AddExerciseModal
           allExercises={allExercises}
@@ -435,6 +430,9 @@ function ClientDetail({ client, therapistId, onBack, activeTab, setActiveTab }) 
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ProgrammeExerciseRow — now includes frequency per week
+// ─────────────────────────────────────────────────────────────────────────────
 function ProgrammeExerciseRow({ pe, idx, onRemove, onUpdate }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
@@ -442,6 +440,7 @@ function ProgrammeExerciseRow({ pe, idx, onRemove, onUpdate }) {
     reps: pe.reps || pe.exercise?.default_reps || '',
     hold_seconds: pe.hold_seconds || pe.exercise?.default_hold_seconds || '',
     rest_seconds: pe.rest_seconds || pe.exercise?.default_rest_seconds || '',
+    frequency_per_week: pe.frequency_per_week ?? 3,
     client_notes: pe.client_notes || '',
   });
 
@@ -451,10 +450,13 @@ function ProgrammeExerciseRow({ pe, idx, onRemove, onUpdate }) {
       reps: form.reps || null,
       hold_seconds: form.hold_seconds || null,
       rest_seconds: form.rest_seconds || null,
+      frequency_per_week: form.frequency_per_week ? parseInt(form.frequency_per_week) : 3,
       client_notes: form.client_notes || null,
     });
     setEditing(false);
   }
+
+  const freq = pe.frequency_per_week ?? 3;
 
   return (
     <div className="card" style={{ marginBottom: '0.5rem' }}>
@@ -462,7 +464,10 @@ function ProgrammeExerciseRow({ pe, idx, onRemove, onUpdate }) {
         <div style={styles.peNum}>{idx + 1}</div>
         <div style={{ flex: 1 }}>
           <div style={styles.peName}>{pe.exercise?.name}</div>
-          <span className="badge badge-navy" style={{ fontSize: '0.65rem' }}>{pe.exercise?.category}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+            <span className="badge badge-navy" style={{ fontSize: '0.65rem' }}>{pe.exercise?.category}</span>
+            <span style={styles.freqBadge}>{freq}× / week</span>
+          </div>
         </div>
         <div style={styles.peActions}>
           <button onClick={() => setEditing(v => !v)} className="btn btn-ghost" style={{ padding: '0.3rem', fontSize: '0.75rem' }}>
@@ -476,6 +481,7 @@ function ProgrammeExerciseRow({ pe, idx, onRemove, onUpdate }) {
 
       {editing && (
         <div style={styles.peEditForm} className="slide-up">
+          {/* Sets, Reps, Hold, Rest */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label" style={{ fontSize: '0.7rem' }}>Sets</label>
@@ -498,12 +504,38 @@ function ProgrammeExerciseRow({ pe, idx, onRemove, onUpdate }) {
                 value={form.rest_seconds} onChange={e => setForm(f => ({ ...f, rest_seconds: e.target.value }))} />
             </div>
           </div>
-          <div className="form-group" style={{ marginBottom: '0.75rem', marginTop: '0.75rem' }}>
+
+          {/* Frequency — full width row */}
+          <div className="form-group" style={{ marginTop: '0.75rem', marginBottom: '0.75rem' }}>
+            <label className="form-label" style={{ fontSize: '0.7rem' }}>Times per week</label>
+            <div style={styles.freqButtons}>
+              {[1, 2, 3, 4, 5, 6, 7].map(n => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, frequency_per_week: n }))}
+                  style={{
+                    ...styles.freqBtn,
+                    ...(form.frequency_per_week === n ? styles.freqBtnActive : {}),
+                  }}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <p style={{ fontSize: '0.7rem', color: 'var(--charcoal)', opacity: 0.55, marginTop: '0.3rem', marginBottom: 0 }}>
+              Shown to the client on their exercise card
+            </p>
+          </div>
+
+          {/* Client notes */}
+          <div className="form-group" style={{ marginBottom: '0.75rem' }}>
             <label className="form-label" style={{ fontSize: '0.7rem' }}>Client-specific notes</label>
             <textarea className="form-textarea" style={{ minHeight: '60px', padding: '0.45rem 0.65rem' }}
               value={form.client_notes} onChange={e => setForm(f => ({ ...f, client_notes: e.target.value }))}
-              placeholder="Custom instruction for this client..." />
+              placeholder={pe.exercise?.therapist_notes_template || 'Custom instruction for this client...'} />
           </div>
+
           <button onClick={save} className="btn btn-primary" style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}>
             <Save size={13} /> Save
           </button>
@@ -513,10 +545,20 @@ function ProgrammeExerciseRow({ pe, idx, onRemove, onUpdate }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// AddExerciseModal — now includes frequency per week
+// ─────────────────────────────────────────────────────────────────────────────
 function AddExerciseModal({ allExercises, assignedIds, onAdd, onClose }) {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(null);
-  const [customisation, setCustomisation] = useState({ sets: '', reps: '', hold_seconds: '', rest_seconds: '', client_notes: '' });
+  const [customisation, setCustomisation] = useState({
+    sets: '',
+    reps: '',
+    hold_seconds: '',
+    rest_seconds: '',
+    frequency_per_week: 3,
+    client_notes: '',
+  });
 
   const available = allExercises
     .filter(ex => !assignedIds.includes(ex.id))
@@ -525,7 +567,7 @@ function AddExerciseModal({ allExercises, assignedIds, onAdd, onClose }) {
 
   async function handleAdd() {
     if (!selected) return;
-    const payload = {};
+    const payload = { frequency_per_week: customisation.frequency_per_week || 3 };
     if (customisation.sets) payload.sets = +customisation.sets;
     if (customisation.reps) payload.reps = customisation.reps;
     if (customisation.hold_seconds) payload.hold_seconds = +customisation.hold_seconds;
@@ -581,6 +623,7 @@ function AddExerciseModal({ allExercises, assignedIds, onAdd, onClose }) {
               <p style={{ fontSize: '0.8rem', color: 'var(--navy)', marginBottom: '0.75rem' }}>
                 Override defaults for <strong>{selected.name}</strong> (leave blank to use library defaults)
               </p>
+
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem 0.75rem' }}>
                 {['sets', 'reps', 'hold_seconds', 'rest_seconds'].map(key => (
                   <div className="form-group" key={key} style={{ marginBottom: 0 }}>
@@ -596,12 +639,33 @@ function AddExerciseModal({ allExercises, assignedIds, onAdd, onClose }) {
                   </div>
                 ))}
               </div>
+
+              {/* Frequency */}
+              <div className="form-group" style={{ marginTop: '0.75rem' }}>
+                <label className="form-label" style={{ fontSize: '0.7rem' }}>Times per week</label>
+                <div style={styles.freqButtons}>
+                  {[1, 2, 3, 4, 5, 6, 7].map(n => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setCustomisation(c => ({ ...c, frequency_per_week: n }))}
+                      style={{
+                        ...styles.freqBtn,
+                        ...(customisation.frequency_per_week === n ? styles.freqBtnActive : {}),
+                      }}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="form-group" style={{ marginTop: '0.75rem' }}>
                 <label className="form-label" style={{ fontSize: '0.7rem' }}>Client-specific note</label>
                 <textarea
                   className="form-textarea"
                   style={{ minHeight: '60px' }}
-                  placeholder="Any note specific to this client..."
+                  placeholder={selected.therapist_notes_template || 'Any note specific to this client...'}
                   value={customisation.client_notes}
                   onChange={e => setCustomisation(c => ({ ...c, client_notes: e.target.value }))}
                 />
@@ -620,6 +684,9 @@ function AddExerciseModal({ allExercises, assignedIds, onAdd, onClose }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// AddInfoModal — unchanged
+// ─────────────────────────────────────────────────────────────────────────────
 function AddInfoModal({ onAdd, onClose }) {
   const [form, setForm] = useState({ title: '', content: '', category: 'General', is_pinned: false });
   const categories = ['General', 'Osteoporosis', 'Exercise Tips', 'Home Care', 'Nutrition', 'Lifestyle'];
@@ -673,6 +740,9 @@ function AddInfoModal({ onAdd, onClose }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// AddClientModal — unchanged
+// ─────────────────────────────────────────────────────────────────────────────
 function AddClientModal({ onClose, onCreate }) {
   const [form, setForm] = useState({ full_name: '', email: '', phone: '', date_of_birth: '' });
   const [loading, setLoading] = useState(false);
@@ -730,6 +800,9 @@ function AddClientModal({ onClose, onCreate }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles
+// ─────────────────────────────────────────────────────────────────────────────
 const styles = {
   page: { padding: '1.5rem', maxWidth: '900px', margin: '0 auto' },
   pageHeader: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.25rem', gap: '1rem', flexWrap: 'wrap' },
@@ -756,7 +829,11 @@ const styles = {
   peNum: { width: '24px', height: '24px', borderRadius: '50%', background: 'var(--navy)', color: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 600, flexShrink: 0 },
   peName: { fontWeight: 500, fontSize: '0.9rem', color: 'var(--navy)', marginBottom: '0.25rem' },
   peActions: { display: 'flex', alignItems: 'center', gap: '0.25rem', marginLeft: 'auto' },
-  peEditForm: { padding: '0 1rem 1rem', borderTop: '1px solid var(--cream-dark)' },
+  peEditForm: { padding: '0.75rem 1rem 1rem', borderTop: '1px solid var(--cream-dark)' },
+  freqBadge: { fontSize: '0.65rem', background: 'rgba(196,122,90,0.12)', color: 'var(--terracotta)', borderRadius: '99px', padding: '0.1rem 0.45rem', fontWeight: 600 },
+  freqButtons: { display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.25rem' },
+  freqBtn: { width: '32px', height: '32px', borderRadius: '50%', border: '1.5px solid var(--cream-dark)', background: 'var(--off-white)', color: 'var(--charcoal)', fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer', fontFamily: 'var(--font-sans)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' },
+  freqBtnActive: { border: '1.5px solid var(--navy)', background: 'var(--navy)', color: 'var(--cream)', fontWeight: 700 },
   infoCategory: { fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--terracotta)', fontWeight: 600 },
   pinnedBar: { background: 'var(--cream)', padding: '0.35rem 1rem', fontSize: '0.75rem', color: 'var(--navy)', borderBottom: '1px solid var(--cream-dark)' },
 };
