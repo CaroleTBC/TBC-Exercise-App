@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage';
 import ClientDashboard from './components/client/ClientDashboard';
 import TherapistDashboard from './components/therapist/TherapistDashboard';
 import './styles/globals.css';
+import { supabase } from './lib/supabase';
 
 function SetPasswordPage() {
   const { user } = useAuth();
@@ -13,8 +14,7 @@ function SetPasswordPage() {
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
-  const { supabase } = require('./lib/supabase');
-
+  
   async function handleSetPassword() {
     if (password.length < 8) {
       setError('Password must be at least 8 characters.');
