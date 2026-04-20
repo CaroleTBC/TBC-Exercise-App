@@ -2,11 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import ComplianceTracker from '../client/ComplianceTracker';
-import {
-  UserPlus, X, ChevronRight, Plus, Trash2,
-  Save, CheckCircle2, BarChart2, BookOpen,
-  AlertCircle, Search
-} from 'lucide-react';
 import { renderMarkdown } from './InformationLibrary';
 
 const SUPABASE_URL = 'https://wysbbhrolgyzjkwwzpyy.supabase.co';
@@ -92,7 +87,10 @@ export default function ClientManager({ onStatsChange }) {
       );
       const result = await response.json();
       if (!response.ok) { alert(`Could not resend: ${result.error}`); return; }
-      alert(`Invite resent to ${client.email}`);
+      const msg = result.type === 'recovery'
+        ? `Password reset email sent to ${client.email}`
+        : `Invite resent to ${client.email}`;
+      alert(msg);
     } catch (err) {
       alert(`Something went wrong: ${err.message}`);
     }
