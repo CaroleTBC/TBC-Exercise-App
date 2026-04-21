@@ -502,3 +502,131 @@ img { max-width: 100%; height: auto; display: block; }
   .th-mobile-bar { display: flex !important; }
   .th-mobile-tabs { display: flex !important; }
 }
+/* ============================================================
+   THERAPY BY CAROLE â€” MOBILE FIXES
+   Append these to the bottom of src/styles/globals.css
+   ============================================================ */
+
+/* â”€â”€ Prevent any horizontal overflow at root level â”€â”€ */
+html, body {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+/* â”€â”€ Logo background â€” constrain to viewport on mobile â”€â”€ */
+@media (max-width: 480px) {
+  body::before {
+    background-size: 280px;
+  }
+}
+
+/* â”€â”€ Client dashboard: section header stacks on small screens â”€â”€ */
+@media (max-width: 400px) {
+  .section-header-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+}
+
+/* â”€â”€ Modal footer: stack buttons on small screens â”€â”€ */
+@media (max-width: 400px) {
+  .modal-footer {
+    flex-direction: column-reverse;
+  }
+  .modal-footer .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* â”€â”€ Therapist client detail tabs: scrollable on mobile â”€â”€ */
+.client-detail-tabs {
+  display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  border-bottom: 2px solid var(--cream-dark);
+  margin-bottom: 1.25rem;
+  gap: 0;
+}
+
+.client-detail-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.client-detail-tab {
+  flex-shrink: 0; /* tabs don't compress â€” they scroll instead */
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  color: var(--charcoal);
+  opacity: 0.6;
+  font-size: 0.875rem;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.client-detail-tab.active {
+  color: var(--navy);
+  opacity: 1;
+  border-bottom-color: var(--terracotta);
+  font-weight: 600;
+}
+
+/* â”€â”€ Exercise prescription row: wrap gracefully on mobile â”€â”€ */
+@media (max-width: 480px) {
+  .pe-row-actions {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .pe-row-actions .freq-controls {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+/* â”€â”€ Exercise params tiles: min size so they don't get too squished â”€â”€ */
+.exercise-params-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.exercise-param-tile {
+  flex: 1 1 56px;
+  min-width: 56px;
+  max-width: 90px;
+}
+
+/* â”€â”€ Completion row buttons: ensure they don't overflow card â”€â”€ */
+@media (max-width: 360px) {
+  .completion-row {
+    gap: 0.3rem;
+  }
+  .completion-row .btn-done,
+  .completion-row .btn-partial,
+  .completion-row .btn-skip {
+    padding: 0.3rem 0.55rem;
+    font-size: 0.72rem;
+  }
+}
+
+/* â”€â”€ Video player: always full width on mobile â”€â”€ */
+@media (max-width: 480px) {
+  .video-wrapper {
+    margin-left: -1rem;
+    margin-right: -1rem;
+    border-radius: 0;
+  }
+}
