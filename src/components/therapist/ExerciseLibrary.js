@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { supabase, EXERCISE_CATEGORIES } from '../../lib/supabase';
-import { useAuth } from '../../hooks/useAuth';
+import { supabase, EXERCISE_CATEGORIES, CATEGORY_LABELS } from '../../lib/supabase';import { useAuth } from '../../hooks/useAuth';
 import VideoPlayer from '../shared/VideoPlayer';
 import {
   Plus, Sparkles, Search, ChevronDown, ChevronUp,
@@ -83,7 +82,7 @@ export default function ExerciseLibrary({ onStatsChange }) {
 Return ONLY valid JSON in this exact format, no other text:
 {
   "name": "Exercise Name",
-  "category": "one of: Balance & Stability, Hip Strength, Lower Body Strength, Mobility & Flexibility, Posture & Alignment, Shoulder & Upper Body, Spinal Health, Weight-Bearing & Impact",
+  "category": "one of: strength, impact, spinal, balance",
   "description": "Clear step-by-step instructions. Include starting position, movement, key technique points, and any safety cues for someone with osteoporosis.",
   "default_sets": 3,
   "default_reps": "10",
@@ -269,7 +268,7 @@ Return ONLY valid JSON in this exact format, no other text:
           Object.entries(grouped).map(([cat, catExercises]) => (
             <div key={cat} style={styles.categorySection}>
               <div style={styles.categoryHeader}>
-                <span style={styles.categoryName}>{cat}</span>
+                <span style={styles.categoryName}>{CATEGORY_LABELS[cat] || cat}</span>
                 <span style={styles.categoryCount}>{catExercises.length}</span>
               </div>
 
