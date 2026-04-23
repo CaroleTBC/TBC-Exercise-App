@@ -35,7 +35,7 @@ const STATUS_CONFIG = {
   },
 };
 
-export default function ComplianceTracker({ programmeId, onLogToday }) {
+export default function ComplianceTracker({ programmeId, onLogToday, userId: userIdProp, readOnly }) {
   const { user } = useAuth();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -45,17 +45,19 @@ export default function ComplianceTracker({ programmeId, onLogToday }) {
   const days = Array.from({ length: 14 }, (_, i) => subDays(new Date(), 13 - i));
 
   useEffect(() => {
-    if (!programmeId || !user) return;
+    const clientId = userIdProp || user?.id;
+    if (!programmeId || !clientId) return;
     fetchLogs();
-  }, [programmeId, user]);
+  }, [programmeId, user, userIdProp]);
 
   async function fetchLogs() {
+    const clientId = userIdProp || user?.id;
     try {
       const since = subDays(new Date(), 14).toISOString().split('T')[0];
       const { data, error } = await supabase
         .from('compliance_logs')
         .select('*')
-        .eq('client_id', user.id)
+        .eq('client_id', clientId)
         .eq('programme_id', programmeId)
         .gte('log_date', since)
         .order('log_date', { ascending: true });
@@ -202,7 +204,7 @@ export default function ComplianceTracker({ programmeId, onLogToday }) {
       </div>
 
       {/* Today's action */}
-      {!todayLog && onLogToday && (
+      {!readOnly && !todayLog && onLogToday && (
         <button
           onClick={onLogToday}
           style={styles.logBtn}

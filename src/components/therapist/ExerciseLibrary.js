@@ -57,9 +57,17 @@ export default function ExerciseLibrary({ onStatsChange }) {
   const grouped = useMemo(() => {
     if (activeCategory !== 'All') return { [activeCategory]: filtered };
     const g = {};
+    // Add exercises in predefined category order first
     EXERCISE_CATEGORIES.forEach(cat => {
       const catExercises = filtered.filter(ex => ex.category === cat);
       if (catExercises.length > 0) g[cat] = catExercises;
+    });
+    // Catch any exercises whose category doesn't match a predefined one
+    const known = new Set(EXERCISE_CATEGORIES);
+    filtered.filter(ex => !known.has(ex.category)).forEach(ex => {
+      const cat = ex.category || 'Other';
+      if (!g[cat]) g[cat] = [];
+      g[cat].push(ex);
     });
     return g;
   }, [filtered, activeCategory]);
