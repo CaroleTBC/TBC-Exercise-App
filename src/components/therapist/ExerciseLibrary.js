@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase, EXERCISE_CATEGORIES, CATEGORY_LABELS } from '../../lib/supabase';
+import { useAuth } from '../../hooks/useAuth';
 import VideoPlayer from '../shared/VideoPlayer';
 import {
   Plus, Sparkles, Search, ChevronDown, ChevronUp,
-  Edit2, Trash2, X, Save, Check, Info
+  Edit2, Trash2, X, Save, Info
 } from 'lucide-react';
 
 export default function ExerciseLibrary({ onStatsChange }) {
@@ -24,12 +25,18 @@ export default function ExerciseLibrary({ onStatsChange }) {
   }, []);
 
   async function fetchExercises() {
-    const { data } = await supabase
-      .from('exercises')
-      .select('*')
-      .order('name');
-    setExercises(data || []);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase
+        .from('exercises')
+        .select('*')
+        .order('name');
+      if (error) throw error;
+      setExercises(data || []);
+    } catch (err) {
+      console.error('Failed to load exercises:', err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const categories = ['All', ...EXERCISE_CATEGORIES];
@@ -59,7 +66,8 @@ export default function ExerciseLibrary({ onStatsChange }) {
 
   async function handleDelete(id) {
     if (!window.confirm('Delete this exercise from the library?')) return;
-    await supabase.from('exercises').delete().eq('id', id);
+    const { error } = await supabase.from('exercises').delete().eq('id', id);
+    if (error) { alert('Failed to delete exercise. Please try again.'); return; }
     setExercises(prev => prev.filter(e => e.id !== id));
     onStatsChange?.();
   }
@@ -70,7 +78,7 @@ export default function ExerciseLibrary({ onStatsChange }) {
 
     try {
       const response = await fetch(
-        'https://wysbbhrolgyzjkwwzpyy.supabase.co/functions/v1/generate-exercise',
+        `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/generate-exercise`,
         {
           method: 'POST',
           headers: {
@@ -131,19 +139,21 @@ export default function ExerciseLibrary({ onStatsChange }) {
     delete payload.id;
 
     if (exercise.id) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('exercises')
         .update(payload)
         .eq('id', exercise.id)
         .select()
         .single();
+      if (error) throw error;
       setExercises(prev => prev.map(e => e.id === exercise.id ? data : e));
     } else {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('exercises')
         .insert(payload)
         .select()
         .single();
+      if (error) throw error;
       setExercises(prev => [...prev, data]);
     }
 
@@ -360,8 +370,13 @@ function ExerciseFormModal({ exercise, onSave, onClose }) {
       return;
     }
     setSaving(true);
-    await onSave(form);
-    setSaving(false);
+    try {
+      await onSave(form);
+    } catch (err) {
+      alert(err.message || 'Failed to save exercise. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (

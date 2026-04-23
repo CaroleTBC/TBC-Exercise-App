@@ -117,7 +117,8 @@ CREATE TABLE exercise_completions (
   completed BOOLEAN DEFAULT false,
   difficulty_rating INTEGER CHECK (difficulty_rating BETWEEN 1 AND 5),
   notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(compliance_log_id, programme_exercise_id)
 );
 
 -- ─────────────────────────────────────────────

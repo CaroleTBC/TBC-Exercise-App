@@ -12,26 +12,8 @@ const TABS = [
   { id: 'library', label: 'Exercise Library', icon: BookOpen },
 ];
 
-export default function TherapistDashboard() {
-  const { profile, signOut } = useAuth();
-  const [activeTab, setActiveTab] = useState('clients');
-  const [stats, setStats] = useState({ clients: 0, exercises: 0, activeProgrammes: 0 });
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
-  async function fetchStats() {
-    const [{ count: clients }, { count: exercises }, { count: progs }] = await Promise.all([
-      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'client'),
-      supabase.from('exercises').select('*', { count: 'exact', head: true }),
-      supabase.from('client_programmes').select('*', { count: 'exact', head: true }).eq('is_active', true),
-    ]);
-    setStats({ clients: clients || 0, exercises: exercises || 0, activeProgrammes: progs || 0 });
-  }
-
-  const SidebarContent = () => (
+function SidebarContent({ profile, stats, activeTab, onTabChange, signOut }) {
+  return (
     <>
       <div style={styles.sidebarLogo}>
         <div style={styles.logoMark}>
@@ -60,7 +42,7 @@ export default function TherapistDashboard() {
           return (
             <button
               key={tab.id}
-              onClick={() => { setActiveTab(tab.id); setSidebarOpen(false); }}
+              onClick={() => onTabChange(tab.id)}
               style={{
                 ...styles.navItem,
                 ...(activeTab === tab.id ? styles.navItemActive : {}),
@@ -85,19 +67,48 @@ export default function TherapistDashboard() {
       </button>
     </>
   );
+}
+
+export default function TherapistDashboard() {
+  const { profile, signOut } = useAuth();
+  const [activeTab, setActiveTab] = useState('clients');
+  const [stats, setStats] = useState({ clients: 0, exercises: 0, activeProgrammes: 0 });
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  async function fetchStats() {
+    try {
+      const [{ count: clients }, { count: exercises }, { count: progs }] = await Promise.all([
+        supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'client'),
+        supabase.from('exercises').select('*', { count: 'exact', head: true }),
+        supabase.from('client_programmes').select('*', { count: 'exact', head: true }).eq('is_active', true),
+      ]);
+      setStats({ clients: clients || 0, exercises: exercises || 0, activeProgrammes: progs || 0 });
+    } catch (err) {
+      console.error('Failed to load stats:', err);
+    }
+  }
+
+  function handleTabChange(tabId) {
+    setActiveTab(tabId);
+    setSidebarOpen(false);
+  }
 
   return (
     <div style={styles.layout}>
       {/* Desktop Sidebar */}
       <aside className="th-sidebar" style={{ display: 'flex', flexDirection: 'column' }}>
-        <SidebarContent />
+        <SidebarContent profile={profile} stats={stats} activeTab={activeTab} onTabChange={handleTabChange} signOut={signOut} />
       </aside>
 
       {/* Mobile overlay sidebar */}
       {sidebarOpen && (
         <div style={styles.mobileOverlay} onClick={() => setSidebarOpen(false)}>
           <div style={styles.mobileSidebar} onClick={e => e.stopPropagation()}>
-            <SidebarContent />
+            <SidebarContent profile={profile} stats={stats} activeTab={activeTab} onTabChange={handleTabChange} signOut={signOut} />
           </div>
         </div>
       )}

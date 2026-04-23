@@ -2,12 +2,13 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import LoginPage from './pages/LoginPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import ClientDashboard from './components/client/ClientDashboard';
 import TherapistDashboard from './components/therapist/TherapistDashboard';
 import './styles/globals.css';
 
 function AppRoutes() {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, needsPasswordReset } = useAuth();
 
   if (loading) {
     return (
@@ -27,6 +28,10 @@ function AppRoutes() {
         <span className="spinner" />
       </div>
     );
+  }
+
+  if (needsPasswordReset) {
+    return <ResetPasswordPage />;
   }
 
   if (!user || !profile) {

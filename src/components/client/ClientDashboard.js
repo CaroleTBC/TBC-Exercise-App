@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import ComplianceTracker from './ComplianceTracker';
@@ -26,8 +26,6 @@ export default function ClientDashboard() {
   const [expandedExercise, setExpandedExercise] = useState(null);
   const [showLogModal, setShowLogModal] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const headerRef = useRef(null);
-  const tabRef = useRef(null);
 
   useEffect(() => {
     fetchProgramme();
@@ -95,7 +93,7 @@ export default function ClientDashboard() {
   return (
     <div style={styles.page}>
       {/* Sticky Header */}
-      <header ref={headerRef} style={styles.header}>
+      <header style={styles.header}>
         <div style={styles.headerInner}>
           <div>
             <div style={styles.headerTitle}>Therapy by Carole</div>
@@ -114,7 +112,7 @@ export default function ClientDashboard() {
         </div>
 
         {/* Sticky Tabs */}
-        <nav ref={tabRef} style={styles.tabs}>
+        <nav style={styles.tabs}>
           {TABS.map(tab => {
             const Icon = tab.icon;
             return (

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { format, subDays, parseISO, isSameDay } from 'date-fns';
+import { format, subDays, isSameDay } from 'date-fns';
 import { CheckCircle2, Circle, MinusCircle, ChevronRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
@@ -50,33 +50,42 @@ export default function ComplianceTracker({ programmeId, onLogToday }) {
   }, [programmeId, user]);
 
   async function fetchLogs() {
-    const since = subDays(new Date(), 14).toISOString().split('T')[0];
-    const { data } = await supabase
-      .from('compliance_logs')
-      .select('*')
-      .eq('client_id', user.id)
-      .eq('programme_id', programmeId)
-      .gte('log_date', since)
-      .order('log_date', { ascending: true });
+    try {
+      const since = subDays(new Date(), 14).toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('compliance_logs')
+        .select('*')
+        .eq('client_id', user.id)
+        .eq('programme_id', programmeId)
+        .gte('log_date', since)
+        .order('log_date', { ascending: true });
+      if (error) throw error;
 
-    const logData = data || [];
-    setLogs(logData);
+      const logData = data || [];
+      setLogs(logData);
 
-    // Calculate streak
-    let s = 0;
-    for (let i = days.length - 1; i >= 0; i--) {
-      const day = days[i];
-      const dayStr = format(day, 'yyyy-MM-dd');
-      const log = logData.find(l => l.log_date === dayStr);
-      if (log && (log.status === 'completed' || log.status === 'partial')) {
-        s++;
-      } else if (i < days.length - 1) {
-        break;
+      // Calculate streak — skip today if not yet logged, then count backwards
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      let s = 0;
+      for (let i = days.length - 1; i >= 0; i--) {
+        const dayStr = format(days[i], 'yyyy-MM-dd');
+        if (dayStr === todayStr && !logData.find(l => l.log_date === dayStr)) {
+          continue;
+        }
+        const log = logData.find(l => l.log_date === dayStr);
+        if (log && (log.status === 'completed' || log.status === 'partial')) {
+          s++;
+        } else {
+          break;
+        }
       }
+      setStreak(s);
+      setCompletedCount(logData.filter(l => l.status === 'completed').length);
+    } catch (err) {
+      console.error('Failed to load compliance logs:', err);
+    } finally {
+      setLoading(false);
     }
-    setStreak(s);
-    setCompletedCount(logData.filter(l => l.status === 'completed').length);
-    setLoading(false);
   }
 
   function getLogForDay(day) {

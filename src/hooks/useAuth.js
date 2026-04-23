@@ -7,17 +7,17 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [needsPasswordReset, setNeedsPasswordReset] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) fetchProfile(session.user.id);
-      else setLoading(false);
-    });
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
         setUser(session?.user ?? null);
+        if (event === 'PASSWORD_RECOVERY') {
+          setNeedsPasswordReset(true);
+          setLoading(false);
+          return;
+        }
         if (session?.user) {
           await fetchProfile(session.user.id);
         } else {
@@ -65,10 +65,15 @@ export function AuthProvider({ children }) {
   const isTherapist = profile?.role === 'therapist';
   const isClient = profile?.role === 'client';
 
+  function clearPasswordReset() {
+    setNeedsPasswordReset(false);
+  }
+
   return (
     <AuthContext.Provider value={{
       user, profile, loading,
       isTherapist, isClient,
+      needsPasswordReset, clearPasswordReset,
       signIn, signOut, resetPassword,
       refreshProfile: () => user && fetchProfile(user.id),
     }}>

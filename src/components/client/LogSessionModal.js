@@ -9,6 +9,7 @@ export default function LogSessionModal({ programme, exercises, onClose, onLogge
   const [completions, setCompletions] = useState({});
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [existingLog, setExistingLog] = useState(null);
   const today = format(new Date(), 'yyyy-MM-dd');
 
@@ -43,6 +44,7 @@ export default function LogSessionModal({ programme, exercises, onClose, onLogge
 
   async function handleSubmit() {
     setLoading(true);
+    setSubmitError('');
     const completedCount = Object.values(completions).filter(Boolean).length;
     const total = exercises.length;
 
@@ -99,7 +101,7 @@ export default function LogSessionModal({ programme, exercises, onClose, onLogge
 
       onLogged();
     } catch (err) {
-      console.error(err);
+      setSubmitError('Failed to save your session. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -137,7 +139,7 @@ export default function LogSessionModal({ programme, exercises, onClose, onLogge
             <div style={styles.progressBarTrack}>
               <div style={{
                 ...styles.progressBarFill,
-                width: `${(completedCount / total) * 100}%`,
+                width: total > 0 ? `${(completedCount / total) * 100}%` : '0%',
                 background: allDone ? 'var(--success)' : noneDone ? '#ddd' : 'var(--terracotta)',
               }} />
             </div>
@@ -196,6 +198,12 @@ export default function LogSessionModal({ programme, exercises, onClose, onLogge
             />
           </div>
         </div>
+
+        {submitError && (
+          <div style={{ padding: '0 1.5rem 0.75rem', color: 'var(--danger)', fontSize: '0.875rem', background: 'var(--danger-bg)', margin: '0 1.5rem 0.75rem', borderRadius: 'var(--radius-sm)', padding: '0.65rem 0.9rem' }}>
+            {submitError}
+          </div>
+        )}
 
         <div className="modal-footer">
           <button onClick={onClose} className="btn btn-ghost">Cancel</button>
