@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { supabase, EXERCISE_CATEGORIES } from '../../lib/supabase';
-import { useAuth } from '../../hooks/useAuth';
+import { supabase, EXERCISE_CATEGORIES, CATEGORY_LABELS } from '../../lib/supabase';import { useAuth } from '../../hooks/useAuth';
 import VideoPlayer from '../shared/VideoPlayer';
 import {
   Plus, Sparkles, Search, ChevronDown, ChevronUp,
@@ -65,40 +64,30 @@ export default function ExerciseLibrary({ onStatsChange }) {
     onStatsChange?.();
   }
 
-  async function generateWithAI() {
+ async function generateWithAI() {
     if (!aiPrompt.trim()) return;
     setAiLoading(true);
 
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          messages: [{
-            role: 'user',
-            content: `You are an expert in strength and conditioning, specialising in exercises for people with osteoporosis, bone health, and general rehabilitation. Generate an exercise based on this request: "${aiPrompt}"
+      const response = await fetch(
+        'https://wysbbhrolgyzjkwwzpyy.supabase.co/functions/v1/generate-exercise',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ prompt: aiPrompt }),
+        }
+      );
 
-Return ONLY valid JSON in this exact format, no other text:
-{
-  "name": "Exercise Name",
-  "category": "one of: Balance & Stability, Hip Strength, Lower Body Strength, Mobility & Flexibility, Posture & Alignment, Shoulder & Upper Body, Spinal Health, Weight-Bearing & Impact",
-  "description": "Clear step-by-step instructions. Include starting position, movement, key technique points, and any safety cues for someone with osteoporosis.",
-  "default_sets": 3,
-  "default_reps": "10",
-  "default_hold_seconds": null,
-  "default_rest_seconds": 60,
-  "therapist_notes_template": "A brief note for the therapist about progressions, regressions, or contraindications."
-}`
-          }]
-        })
-      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Generation failed');
+      }
 
       const data = await response.json();
-      const text = data.content?.[0]?.text || '';
-      const clean = text.replace(/```json|```/g, '').trim();
-      const generated = JSON.parse(clean);
+      const generated = data.exercise;
 
       setEditingExercise({
         ...generated,
@@ -269,7 +258,7 @@ Return ONLY valid JSON in this exact format, no other text:
           Object.entries(grouped).map(([cat, catExercises]) => (
             <div key={cat} style={styles.categorySection}>
               <div style={styles.categoryHeader}>
-                <span style={styles.categoryName}>{cat}</span>
+                <span style={styles.categoryName}>{CATEGORY_LABELS[cat] || cat}</span>
                 <span style={styles.categoryCount}>{catExercises.length}</span>
               </div>
 
