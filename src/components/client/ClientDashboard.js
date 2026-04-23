@@ -23,6 +23,7 @@ export default function ClientDashboard() {
   const [exercises, setExercises] = useState([]);
   const [information, setInformation] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
   const [expandedExercise, setExpandedExercise] = useState(null);
   const [showLogModal, setShowLogModal] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -33,8 +34,9 @@ export default function ClientDashboard() {
 
   async function fetchProgramme() {
     setLoading(true);
+    setFetchError(null);
     try {
-      const { data: programmes } = await supabase
+      const { data: programmes, error: progErr } = await supabase
         .from('client_programmes')
         .select('*')
         .eq('client_id', profile.id)
@@ -42,11 +44,12 @@ export default function ClientDashboard() {
         .order('created_at', { ascending: false })
         .limit(1);
 
+      if (progErr) throw progErr;
       if (!programmes?.length) { setLoading(false); return; }
       const prog = programmes[0];
       setProgramme(prog);
 
-      const { data: progExercises } = await supabase
+      const { data: progExercises, error: exErr } = await supabase
         .from('programme_exercises')
         .select(`
           *,
@@ -56,15 +59,21 @@ export default function ClientDashboard() {
         .eq('is_active', true)
         .order('sort_order');
 
-      const { data: info } = await supabase
+      if (exErr) throw exErr;
+
+      const { data: info, error: infoErr } = await supabase
         .from('client_information')
         .select('*')
         .eq('client_id', profile.id)
         .order('is_pinned', { ascending: false })
         .order('created_at', { ascending: false });
 
+      if (infoErr) throw infoErr;
+
       setExercises(progExercises || []);
       setInformation(info || []);
+    } catch (err) {
+      setFetchError(err.message || 'Failed to load your programme.');
     } finally {
       setLoading(false);
     }
@@ -86,6 +95,19 @@ export default function ClientDashboard() {
       <div style={styles.loadingPage}>
         <span className="spinner" />
         <p style={{ marginTop: '1rem', color: 'var(--navy)', opacity: 0.6 }}>Loading your programme...</p>
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div style={styles.loadingPage}>
+        <p style={{ color: 'var(--danger)', fontSize: '0.9rem', textAlign: 'center', padding: '1rem' }}>
+          {fetchError}
+        </p>
+        <button onClick={fetchProgramme} className="btn btn-primary" style={{ marginTop: '0.75rem' }}>
+          Try again
+        </button>
       </div>
     );
   }
@@ -366,16 +388,18 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     gap: '0.4rem',
-    padding: '0.7rem 0.5rem',
+    padding: '0.7rem 0.25rem',
     background: 'transparent',
     border: 'none',
     color: 'rgba(239,231,220,0.6)',
-    fontSize: '0.8rem',
+    fontSize: 'clamp(0.65rem, 2.2vw, 0.8rem)',
     fontFamily: 'var(--font-sans)',
     fontWeight: 400,
     cursor: 'pointer',
     borderBottom: '2px solid transparent',
     transition: 'all 0.2s',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
   },
   tabActive: {
     color: 'var(--cream)',
