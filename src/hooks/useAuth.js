@@ -10,12 +10,19 @@ export function AuthProvider({ children }) {
   const [needsPasswordReset, setNeedsPasswordReset] = useState(false);
 
   useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) fetchProfile(session.user.id);
+      else setLoading(false);
+    });
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (event === 'INITIAL_SESSION') return;
+
         setUser(session?.user ?? null);
         if (event === 'PASSWORD_RECOVERY') {
           setNeedsPasswordReset(true);
-          setLoading(false);
           return;
         }
         if (session?.user) {
