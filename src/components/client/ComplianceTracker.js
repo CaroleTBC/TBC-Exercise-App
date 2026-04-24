@@ -1,46 +1,55 @@
 import React, { useEffect, useState } from 'react';
 import { format, subDays, isSameDay } from 'date-fns';
-import { CheckCircle2, Circle, MinusCircle, ChevronRight } from 'lucide-react';
+import { CheckCircle2, Circle, ChevronRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 
 const STATUS_CONFIG = {
   completed: {
-    label: 'Done',
+    label: 'Full session',
     color: 'var(--success)',
     bg: 'var(--success-bg)',
     icon: CheckCircle2,
-    emoji: '✅',
   },
   partial: {
-    label: 'Partial',
-    color: 'var(--partial)',
-    bg: 'var(--partial-bg)',
-    icon: MinusCircle,
-    emoji: '🟡',
+    label: 'Active',
+    color: 'var(--terracotta)',
+    bg: 'rgba(196,122,90,0.15)',
+    icon: CheckCircle2,   // same icon, different colour — still a win
   },
   missed: {
-    label: 'Missed',
-    color: '#ccc',
-    bg: '#f5f5f5',
+    label: 'Rest day',
+    color: '#b0b0b0',
+    bg: '#f2f2f2',
     icon: Circle,
-    emoji: '○',
   },
   none: {
-    label: 'No data',
+    label: '',
     color: '#ddd',
     bg: '#fafafa',
     icon: Circle,
-    emoji: '○',
   },
 };
+
+function getEncouragement(streak, activeDays) {
+  if (streak >= 14) return "Two full weeks without a break — extraordinary. 🌟";
+  if (streak >= 7)  return `${streak} days straight. Your body is responding to this. 💪`;
+  if (streak >= 5)  return `${streak} days in a row — this is becoming a habit.`;
+  if (streak >= 3)  return `${streak} days running. Keep that momentum going.`;
+  if (streak >= 1)  return `${streak} day${streak > 1 ? 's' : ''} active — every session adds up.`;
+  if (activeDays >= 8) return "Consistent over the past two weeks — that's what counts.";
+  if (activeDays >= 3) return "Some days on, some days off — that's real life, and it still works.";
+  if (activeDays >= 1) return "Any exercise is better than none. You're building something.";
+  return null;
+}
 
 export default function ComplianceTracker({ programmeId, onLogToday, userId: userIdProp, readOnly }) {
   const { user } = useAuth();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [streak, setStreak] = useState(0);
-  const [completedCount, setCompletedCount] = useState(0);
+  const [activeDays, setActiveDays] = useState(0);
+  const [fullSessions, setFullSessions] = useState(0);
 
   const days = Array.from({ length: 14 }, (_, i) => subDays(new Date(), 13 - i));
 
@@ -66,14 +75,12 @@ export default function ComplianceTracker({ programmeId, onLogToday, userId: use
       const logData = data || [];
       setLogs(logData);
 
-      // Calculate streak — skip today if not yet logged, then count backwards
+      // Streak: any active day (completed or partial) counts
       const todayStr = format(new Date(), 'yyyy-MM-dd');
       let s = 0;
       for (let i = days.length - 1; i >= 0; i--) {
         const dayStr = format(days[i], 'yyyy-MM-dd');
-        if (dayStr === todayStr && !logData.find(l => l.log_date === dayStr)) {
-          continue;
-        }
+        if (dayStr === todayStr && !logData.find(l => l.log_date === dayStr)) continue;
         const log = logData.find(l => l.log_date === dayStr);
         if (log && (log.status === 'completed' || log.status === 'partial')) {
           s++;
@@ -82,7 +89,8 @@ export default function ComplianceTracker({ programmeId, onLogToday, userId: use
         }
       }
       setStreak(s);
-      setCompletedCount(logData.filter(l => l.status === 'completed').length);
+      setActiveDays(logData.filter(l => l.status === 'completed' || l.status === 'partial').length);
+      setFullSessions(logData.filter(l => l.status === 'completed').length);
     } catch (err) {
       console.error('Failed to load compliance logs:', err);
     } finally {
@@ -102,42 +110,33 @@ export default function ComplianceTracker({ programmeId, onLogToday, userId: use
 
   const today = new Date();
   const todayLog = getLogForDay(today);
+  const encouragement = getEncouragement(streak, activeDays);
 
   if (loading) {
-    return (
-      <div style={styles.loadingWrapper}>
-        <span className="spinner" />
-      </div>
-    );
+    return <div style={styles.loadingWrapper}><span className="spinner" /></div>;
   }
 
   return (
     <div style={styles.wrapper} className="fade-in">
-      {/* Header Stats */}
+      {/* Stats */}
       <div style={styles.statsRow}>
         <div style={styles.statCard}>
           <span style={styles.statNumber}>{streak}</span>
           <span style={styles.statLabel}>day streak 🔥</span>
         </div>
-        <div style={styles.statCard}>
-          <span style={styles.statNumber}>{completedCount}</span>
-          <span style={styles.statLabel}>full sessions</span>
+        <div style={{ ...styles.statCard, background: 'rgba(196,122,90,0.1)' }}>
+          <span style={styles.statNumber}>{activeDays}</span>
+          <span style={styles.statLabel}>active days</span>
         </div>
         <div style={styles.statCard}>
-          <span style={styles.statNumber}>{logs.filter(l => l.status !== 'missed').length}</span>
-          <span style={styles.statLabel}>days active</span>
+          <span style={styles.statNumber}>{fullSessions}</span>
+          <span style={styles.statLabel}>full sessions</span>
         </div>
       </div>
 
-      {/* Encouragement message */}
-      {streak > 0 && (
-        <div style={styles.encouragement}>
-          {streak >= 7
-            ? `Outstanding — ${streak} days straight. Your bones are adapting. 💪`
-            : streak >= 3
-            ? `${streak} days in a row. Keep building on it.`
-            : `Good start — ${streak} day${streak > 1 ? 's' : ''} in a row.`}
-        </div>
+      {/* Encouragement */}
+      {encouragement && (
+        <div style={styles.encouragement}>{encouragement}</div>
       )}
 
       {/* 14-day grid */}
@@ -153,25 +152,16 @@ export default function ComplianceTracker({ programmeId, onLogToday, userId: use
           return (
             <div
               key={i}
-              style={{
-                ...styles.dayCell,
-                opacity: isFuture ? 0.3 : 1,
-              }}
-              title={`${format(day, 'EEE d MMM')} — ${config.label}`}
+              style={{ ...styles.dayCell, opacity: isFuture ? 0.25 : 1 }}
+              title={`${format(day, 'EEE d MMM')}${log ? ` — ${config.label}` : ''}`}
             >
               <span style={styles.dayName}>{format(day, 'EEE')}</span>
-              <div
-                style={{
-                  ...styles.dayDot,
-                  background: config.bg,
-                  border: isToday ? `2px solid var(--navy)` : '2px solid transparent',
-                }}
-              >
-                <IconComponent
-                  size={14}
-                  color={config.color}
-                  strokeWidth={2.5}
-                />
+              <div style={{
+                ...styles.dayDot,
+                background: config.bg,
+                border: isToday ? '2px solid var(--navy)' : '2px solid transparent',
+              }}>
+                <IconComponent size={14} color={config.color} strokeWidth={2.5} />
               </div>
               <span style={{
                 ...styles.dayNum,
@@ -180,11 +170,6 @@ export default function ComplianceTracker({ programmeId, onLogToday, userId: use
               }}>
                 {format(day, 'd')}
               </span>
-              {log && log.status === 'partial' && log.exercises_completed > 0 && (
-                <span style={styles.partialText}>
-                  {log.exercises_completed}/{log.exercises_total}
-                </span>
-              )}
             </div>
           );
         })}
@@ -205,11 +190,7 @@ export default function ComplianceTracker({ programmeId, onLogToday, userId: use
 
       {/* Today's action */}
       {!readOnly && !todayLog && onLogToday && (
-        <button
-          onClick={onLogToday}
-          style={styles.logBtn}
-          className="btn btn-secondary"
-        >
+        <button onClick={onLogToday} style={styles.logBtn} className="btn btn-secondary">
           Log today's session
           <ChevronRight size={16} />
         </button>
@@ -219,13 +200,13 @@ export default function ComplianceTracker({ programmeId, onLogToday, userId: use
         <div style={{
           ...styles.todayStatus,
           background: getStatusConfig(todayLog).bg,
-          color: getStatusConfig(todayLog).color,
+          borderLeft: `3px solid ${getStatusConfig(todayLog).color}`,
         }}>
           {todayLog.status === 'completed'
-            ? "Today's session is logged — well done! ✅"
+            ? "Full session logged today — excellent work! ✅"
             : todayLog.status === 'partial'
-            ? `Partial session logged today (${todayLog.exercises_completed} of ${todayLog.exercises_total} exercises)`
-            : "Today marked as missed"}
+            ? "Session logged today — doing something always counts ✅"
+            : "Rest day logged."}
         </div>
       )}
     </div>
@@ -233,19 +214,9 @@ export default function ComplianceTracker({ programmeId, onLogToday, userId: use
 }
 
 const styles = {
-  wrapper: {
-    padding: '1.25rem',
-  },
-  loadingWrapper: {
-    display: 'flex',
-    justifyContent: 'center',
-    padding: '2rem',
-  },
-  statsRow: {
-    display: 'flex',
-    gap: '0.75rem',
-    marginBottom: '1rem',
-  },
+  wrapper: { padding: '1.25rem' },
+  loadingWrapper: { display: 'flex', justifyContent: 'center', padding: '2rem' },
+  statsRow: { display: 'flex', gap: '0.75rem', marginBottom: '1rem' },
   statCard: {
     flex: 1,
     background: 'var(--cream)',
@@ -322,11 +293,6 @@ const styles = {
     fontSize: '0.7rem',
     opacity: 0.7,
   },
-  partialText: {
-    fontSize: '0.55rem',
-    color: 'var(--partial)',
-    opacity: 0.8,
-  },
   legend: {
     display: 'flex',
     gap: '1rem',
@@ -350,10 +316,11 @@ const styles = {
     marginTop: '0.25rem',
   },
   todayStatus: {
-    textAlign: 'center',
-    padding: '0.75rem',
+    padding: '0.75rem 1rem',
     borderRadius: 'var(--radius-md)',
     fontSize: '0.875rem',
     fontWeight: 500,
+    color: 'var(--navy)',
+    background: 'var(--cream)',
   },
 };
