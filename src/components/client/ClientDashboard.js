@@ -83,6 +83,32 @@ export default function ClientDashboard() {
     setExpandedExercise(prev => prev === id ? null : id);
   }
 
+  function DescriptionText({ text }) {
+    if (!text) return null;
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const allNumbered = lines.length > 1 && lines.every(l => /^\d+[.)]\s/.test(l));
+    if (allNumbered) {
+      return (
+        <ol style={{ margin: 0, paddingLeft: '1.4rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+          {lines.map((line, i) => (
+            <li key={i} style={{ lineHeight: 1.65, fontSize: '0.9rem', color: 'var(--charcoal)' }}>
+              {line.replace(/^\d+[.)]\s*/, '')}
+            </li>
+          ))}
+        </ol>
+      );
+    }
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+        {lines.map((line, i) => (
+          <p key={i} style={{ margin: 0, lineHeight: 1.65, fontSize: '0.9rem', color: 'var(--charcoal)' }}>
+            {line}
+          </p>
+        ))}
+      </div>
+    );
+  }
+
   function onSessionLogged() {
     setRefreshTrigger(t => t + 1);
     setShowLogModal(false);
@@ -232,7 +258,7 @@ export default function ClientDashboard() {
 
                           {ex?.description && (
                             <div style={styles.description}>
-                              <p>{ex.description}</p>
+                              <DescriptionText text={ex.description} />
                             </div>
                           )}
 
@@ -527,9 +553,8 @@ const styles = {
     marginTop: '0.1rem',
   },
   description: {
-    fontSize: '0.9rem',
-    lineHeight: 1.7,
-    color: 'var(--charcoal)',
+    marginTop: '0.75rem',
+    marginBottom: '0.5rem',
   },
   clientNotes: {
     display: 'flex',
