@@ -460,6 +460,7 @@ function ProgrammeExerciseRow({ pe, idx, onRemove, onUpdate }) {
     hold_seconds: pe.hold_seconds ?? pe.exercise?.default_hold_seconds ?? '',
     rest_seconds: pe.rest_seconds ?? pe.exercise?.default_rest_seconds ?? '',
     client_notes: pe.client_notes ?? '',
+    frequency_per_week: pe.frequency_per_week ?? '',
   });
 
   async function save() {
@@ -469,6 +470,7 @@ function ProgrammeExerciseRow({ pe, idx, onRemove, onUpdate }) {
       hold_seconds: form.hold_seconds !== '' ? +form.hold_seconds : null,
       rest_seconds: form.rest_seconds !== '' ? +form.rest_seconds : null,
       client_notes: form.client_notes || null,
+      frequency_per_week: form.frequency_per_week !== '' ? +form.frequency_per_week : null,
     });
     setEditing(false);
   }
@@ -479,7 +481,14 @@ function ProgrammeExerciseRow({ pe, idx, onRemove, onUpdate }) {
         <div style={styles.peNum}>{idx + 1}</div>
         <div style={{ flex: 1 }}>
           <div style={styles.peName}>{pe.exercise?.name}</div>
-          <span className="badge badge-navy" style={{ fontSize: '0.65rem' }}>{pe.exercise?.category}</span>
+          <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
+            <span className="badge badge-navy" style={{ fontSize: '0.65rem' }}>{pe.exercise?.category}</span>
+            {pe.frequency_per_week && (
+              <span className="badge" style={{ fontSize: '0.65rem', background: 'rgba(196,122,90,0.15)', color: 'var(--terracotta)' }}>
+                {pe.frequency_per_week}× per week
+              </span>
+            )}
+          </div>
         </div>
         <div style={styles.peActions}>
           <button
@@ -520,6 +529,20 @@ function ProgrammeExerciseRow({ pe, idx, onRemove, onUpdate }) {
               </div>
             ))}
           </div>
+          <div className="form-group" style={{ marginBottom: 0, marginTop: '0.75rem' }}>
+            <label className="form-label" style={{ fontSize: '0.7rem' }}>Times per week</label>
+            <select
+              className="form-select"
+              style={{ padding: '0.45rem 0.65rem' }}
+              value={form.frequency_per_week}
+              onChange={e => setForm(f => ({ ...f, frequency_per_week: e.target.value }))}
+            >
+              <option value="">Not set</option>
+              {[1,2,3,4,5,6,7].map(n => (
+                <option key={n} value={n}>{n}× per week</option>
+              ))}
+            </select>
+          </div>
           <div className="form-group" style={{ marginBottom: '0.75rem', marginTop: '0.75rem' }}>
             <label className="form-label" style={{ fontSize: '0.7rem' }}>Client-specific notes</label>
             <textarea
@@ -543,7 +566,7 @@ function AddExerciseModal({ allExercises, assignedIds, onAdd, onClose }) {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(null);
   const [customisation, setCustomisation] = useState({
-    sets: '', reps: '', hold_seconds: '', rest_seconds: '', client_notes: '',
+    sets: '', reps: '', hold_seconds: '', rest_seconds: '', client_notes: '', frequency_per_week: '',
   });
 
   const available = allExercises
@@ -559,6 +582,7 @@ function AddExerciseModal({ allExercises, assignedIds, onAdd, onClose }) {
     if (customisation.hold_seconds) payload.hold_seconds = +customisation.hold_seconds;
     if (customisation.rest_seconds) payload.rest_seconds = +customisation.rest_seconds;
     if (customisation.client_notes) payload.client_notes = customisation.client_notes;
+    if (customisation.frequency_per_week) payload.frequency_per_week = +customisation.frequency_per_week;
     onAdd(selected.id, payload);
   }
 
@@ -636,6 +660,19 @@ function AddExerciseModal({ allExercises, assignedIds, onAdd, onClose }) {
                     />
                   </div>
                 ))}
+              </div>
+              <div className="form-group" style={{ marginTop: '0.75rem', marginBottom: 0 }}>
+                <label className="form-label" style={{ fontSize: '0.7rem' }}>Times per week</label>
+                <select
+                  className="form-select"
+                  value={customisation.frequency_per_week}
+                  onChange={e => setCustomisation(c => ({ ...c, frequency_per_week: e.target.value }))}
+                >
+                  <option value="">Not set</option>
+                  {[1,2,3,4,5,6,7].map(n => (
+                    <option key={n} value={n}>{n}× per week</option>
+                  ))}
+                </select>
               </div>
               <div className="form-group" style={{ marginTop: '0.75rem' }}>
                 <label className="form-label" style={{ fontSize: '0.7rem' }}>Client-specific note</label>

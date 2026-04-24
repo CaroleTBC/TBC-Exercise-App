@@ -89,19 +89,31 @@ export default function ClientDashboard() {
     const allNumbered = lines.length > 1 && lines.every(l => /^\d+[.)]\s/.test(l));
     if (allNumbered) {
       return (
-        <ol style={{ margin: 0, paddingLeft: '1.4rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           {lines.map((line, i) => (
-            <li key={i} style={{ lineHeight: 1.65, fontSize: '0.9rem', color: 'var(--charcoal)' }}>
-              {line.replace(/^\d+[.)]\s*/, '')}
-            </li>
+            <div key={i} style={{
+              display: 'flex', gap: '0.75rem', alignItems: 'flex-start',
+              background: 'var(--white)', border: '1px solid var(--cream-dark)',
+              borderRadius: 'var(--radius-md)', padding: '0.7rem 0.9rem',
+            }}>
+              <span style={{
+                width: '22px', height: '22px', minWidth: '22px', borderRadius: '50%',
+                background: 'var(--terracotta)', color: 'white',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '0.7rem', fontWeight: 700,
+              }}>{i + 1}</span>
+              <span style={{ fontSize: '0.875rem', lineHeight: 1.65, color: 'var(--charcoal)' }}>
+                {line.replace(/^\d+[.)]\s*/, '')}
+              </span>
+            </div>
           ))}
-        </ol>
+        </div>
       );
     }
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
         {lines.map((line, i) => (
-          <p key={i} style={{ margin: 0, lineHeight: 1.65, fontSize: '0.9rem', color: 'var(--charcoal)' }}>
+          <p key={i} style={{ margin: 0, lineHeight: 1.65, fontSize: '0.875rem', color: 'var(--charcoal)' }}>
             {line}
           </p>
         ))}
@@ -237,6 +249,7 @@ export default function ClientDashboard() {
                               {sets && <span style={styles.metaItem}><RotateCcw size={11} /> {sets} sets</span>}
                               {reps && <span style={styles.metaItem}>× {reps}</span>}
                               {hold && <span style={styles.metaItem}><Clock size={11} /> {hold}s hold</span>}
+                              {pe.frequency_per_week && <span style={styles.metaItem}><Calendar size={11} /> {pe.frequency_per_week}× per week</span>}
                             </div>
                           </div>
                         </div>
@@ -274,14 +287,6 @@ export default function ClientDashboard() {
                   );
                 })}
 
-                <button
-                  onClick={() => setShowLogModal(true)}
-                  className="btn btn-secondary"
-                  style={styles.logFloatBtn}
-                >
-                  <BarChart2 size={16} />
-                  Log today's session
-                </button>
               </div>
             )}
           </div>
@@ -460,7 +465,7 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     gap: '0.75rem',
-    paddingBottom: '5rem',
+    paddingBottom: '1rem',
   },
   exerciseCard: {
     animation: 'fadeIn 0.3s ease forwards',
@@ -569,16 +574,6 @@ const styles = {
     color: 'var(--charcoal)',
     lineHeight: 1.6,
   },
-  logFloatBtn: {
-    width: '100%',
-    justifyContent: 'center',
-    padding: '0.9rem',
-    fontSize: '0.95rem',
-    marginTop: '0.5rem',
-    position: 'sticky',
-    bottom: '1rem',
-    boxShadow: 'var(--shadow-lg)',
-  },
   infoList: {
     display: 'flex',
     flexDirection: 'column',
@@ -588,11 +583,12 @@ const styles = {
     overflow: 'hidden',
   },
   pinnedBar: {
-    background: 'var(--cream)',
-    padding: '0.4rem 1rem',
-    fontSize: '0.75rem',
-    color: 'var(--navy)',
-    borderBottom: '1px solid var(--cream-dark)',
+    background: 'var(--terracotta)',
+    padding: '0.35rem 1rem',
+    fontSize: '0.72rem',
+    color: 'white',
+    fontWeight: 600,
+    letterSpacing: '0.03em',
   },
   infoContent: {
     padding: '1.25rem',
@@ -607,7 +603,9 @@ const styles = {
   },
   infoTitle: {
     fontSize: '1.2rem',
+    fontFamily: 'var(--font-serif)',
     color: 'var(--navy)',
+    fontWeight: 500,
     marginBottom: '0.75rem',
   },
   infoText: {
