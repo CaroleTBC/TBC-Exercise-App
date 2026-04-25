@@ -39,7 +39,12 @@ export default function ExerciseLibrary({ onStatsChange }) {
     }
   }
 
-  const categories = ['All', ...EXERCISE_CATEGORIES];
+  const categories = useMemo(() => {
+    const seen = new Set(exercises.map(ex => ex.category).filter(Boolean));
+    const ordered = EXERCISE_CATEGORIES.filter(c => seen.has(c));
+    const extras = [...seen].filter(c => !EXERCISE_CATEGORIES.includes(c)).sort();
+    return ['All', ...ordered, ...extras];
+  }, [exercises]);
 
   const filtered = useMemo(() => {
     return exercises

@@ -312,12 +312,26 @@ export default function ClientDashboard() {
 
   return (
     <div style={styles.page}>
+      {/* Faded logo watermark */}
+      <div style={styles.watermark} aria-hidden="true">
+        <svg width="320" height="320" viewBox="0 0 32 32" fill="none">
+          <circle cx="16" cy="16" r="15" stroke="#2f456f" strokeWidth="1.5"/>
+          <path d="M10 16 Q16 8 22 16 Q16 24 10 16Z" fill="#2f456f"/>
+        </svg>
+      </div>
+
       {/* Sticky Header */}
       <header style={styles.header}>
         <div style={styles.headerInner}>
-          <div>
-            <div style={styles.headerTitle}>Therapy by Carole</div>
-            <div style={styles.headerSub}>{programme?.name || `Hi ${firstName}`}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <svg width="28" height="28" viewBox="0 0 32 32" fill="none" style={{ flexShrink: 0 }}>
+              <circle cx="16" cy="16" r="15" stroke="#c47a5a" strokeWidth="2"/>
+              <path d="M10 16 Q16 8 22 16 Q16 24 10 16Z" fill="rgba(239,231,220,0.8)"/>
+            </svg>
+            <div>
+              <div style={styles.headerTitle}>Therapy by Carole</div>
+              <div style={styles.headerSub}>{programme?.name || `Hi ${firstName}`}</div>
+            </div>
           </div>
           <button
             onClick={signOut}
@@ -556,7 +570,8 @@ export default function ClientDashboard() {
 }
 
 const styles = {
-  page: { minHeight: '100vh', background: 'var(--off-white)', display: 'flex', flexDirection: 'column' },
+  page: { minHeight: '100vh', background: 'var(--off-white)', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' },
+  watermark: { position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', opacity: 0.04, pointerEvents: 'none', zIndex: 0 },
   loadingPage: { minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' },
   header: { position: 'sticky', top: 0, zIndex: 100, background: 'var(--navy)', boxShadow: 'var(--shadow-md)' },
   headerInner: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem 0.5rem', maxWidth: '800px', margin: '0 auto', width: '100%' },
@@ -565,7 +580,7 @@ const styles = {
   tabs: { display: 'flex', maxWidth: '800px', margin: '0 auto', width: '100%', padding: '0 0.5rem' },
   tab: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.7rem 0.25rem', background: 'transparent', border: 'none', color: 'rgba(239,231,220,0.6)', fontSize: 'clamp(0.65rem, 2.2vw, 0.8rem)', fontFamily: 'var(--font-sans)', fontWeight: 400, cursor: 'pointer', borderBottom: '2px solid transparent', transition: 'all 0.2s', whiteSpace: 'nowrap', overflow: 'hidden' },
   tabActive: { color: 'var(--cream)', borderBottomColor: 'var(--terracotta)', fontWeight: 600 },
-  main: { flex: 1, maxWidth: '800px', margin: '0 auto', width: '100%', padding: '1rem' },
+  main: { flex: 1, maxWidth: '800px', margin: '0 auto', width: '100%', padding: '1rem', position: 'relative', zIndex: 1 },
   sectionHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--navy)', opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem', padding: '0 0.25rem' },
   reviewDate: { display: 'flex', alignItems: 'center', gap: '0.3rem' },
   exerciseList: { display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingBottom: '1rem' },

@@ -3,13 +3,15 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import ExerciseLibrary from './ExerciseLibrary';
 import ClientManager from './ClientManager';
+import InformationManager from './InformationManager';
 import {
-  Users, BookOpen, LogOut, Activity, ChevronRight
+  Users, BookOpen, LogOut, Activity, ChevronRight, FileText
 } from 'lucide-react';
 
 const TABS = [
   { id: 'clients', label: 'Clients', icon: Users },
   { id: 'library', label: 'Exercise Library', icon: BookOpen },
+  { id: 'information', label: 'Information', icon: FileText },
 ];
 
 function SidebarContent({ profile, stats, activeTab, onTabChange, signOut }) {
@@ -154,6 +156,7 @@ export default function TherapistDashboard() {
         <main style={styles.main}>
           {activeTab === 'clients' && <ClientManager onStatsChange={fetchStats} />}
           {activeTab === 'library' && <ExerciseLibrary onStatsChange={fetchStats} />}
+          {activeTab === 'information' && <InformationManager />}
         </main>
       </div>
     </div>
