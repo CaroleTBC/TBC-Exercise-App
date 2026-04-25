@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import { Plus, Trash2, X, ChevronDown, ChevronUp, Search } from 'lucide-react';
+import { Plus, Trash2, X, ChevronDown, ChevronUp, Search, Edit2 } from 'lucide-react';
 
 const CATEGORIES = ['General', 'Osteoporosis', 'Exercise Tips', 'Home Care', 'Nutrition', 'Lifestyle'];
 
@@ -45,6 +45,7 @@ export default function InformationManager() {
   const [filterClient, setFilterClient] = useState('');
   const [expandedId, setExpandedId] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [editingArticle, setEditingArticle] = useState(null);
 
   useEffect(() => { fetchAll(); }, []);
 
@@ -83,6 +84,18 @@ export default function InformationManager() {
     if (error) { alert('Failed to save article.'); return; }
     setArticles(prev => [data, ...prev]);
     setShowAdd(false);
+  }
+
+  async function updateArticle(id, form) {
+    const { data, error } = await supabase
+      .from('client_information')
+      .update(form)
+      .eq('id', id)
+      .select('*, client:profiles!client_information_client_id_fkey(id, full_name)')
+      .single();
+    if (error) { alert('Failed to update article.'); return; }
+    setArticles(prev => prev.map(a => a.id === id ? data : a));
+    setEditingArticle(null);
   }
 
   const filtered = articles.filter(a => {
@@ -159,6 +172,14 @@ export default function InformationManager() {
                       {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </button>
                     <button
+                      onClick={() => setEditingArticle(article)}
+                      className="btn btn-ghost"
+                      style={{ padding: '0.3rem' }}
+                      title="Edit"
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                    <button
                       onClick={() => deleteArticle(article.id)}
                       className="btn btn-ghost"
                       style={{ padding: '0.3rem', color: 'var(--danger)' }}
@@ -199,17 +220,27 @@ export default function InformationManager() {
           onClose={() => setShowAdd(false)}
         />
       )}
+
+      {editingArticle && (
+        <AddArticleModal
+          clients={clients}
+          initial={editingArticle}
+          onAdd={form => updateArticle(editingArticle.id, form)}
+          onClose={() => setEditingArticle(null)}
+        />
+      )}
     </div>
   );
 }
 
-function AddArticleModal({ clients, onAdd, onClose }) {
+function AddArticleModal({ clients, onAdd, onClose, initial }) {
+  const isEdit = !!initial;
   const [form, setForm] = useState({
-    client_id: '',
-    title: '',
-    content: '',
-    category: 'General',
-    is_pinned: false,
+    client_id: initial?.client_id ?? '',
+    title: initial?.title ?? '',
+    content: initial?.content ?? '',
+    category: initial?.category ?? 'General',
+    is_pinned: initial?.is_pinned ?? false,
   });
   const [saving, setSaving] = useState(false);
 
@@ -226,7 +257,7 @@ function AddArticleModal({ clients, onAdd, onClose }) {
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-content" style={{ maxWidth: '640px' }}>
         <div className="modal-header">
-          <h2 style={{ fontSize: '1.2rem' }}>Add Information Article</h2>
+          <h2 style={{ fontSize: '1.2rem' }}>{isEdit ? 'Edit Article' : 'Add Information Article'}</h2>
           <button onClick={onClose} className="btn btn-ghost" style={{ padding: '0.4rem' }}>
             <X size={20} />
           </button>
@@ -292,7 +323,7 @@ function AddArticleModal({ clients, onAdd, onClose }) {
           <button onClick={onClose} className="btn btn-ghost">Cancel</button>
           <button onClick={handleSave} className="btn btn-primary" disabled={saving} style={{ gap: '0.5rem' }}>
             {saving ? <span className="spinner" style={{ width: '1rem', height: '1rem', borderWidth: '2px' }} /> : <Plus size={15} />}
-            {saving ? 'Saving…' : 'Save Article'}
+            {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Save Article'}
           </button>
         </div>
       </div>

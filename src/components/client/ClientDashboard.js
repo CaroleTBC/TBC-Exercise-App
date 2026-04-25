@@ -95,10 +95,16 @@ export default function ClientDashboard() {
       {/* Sticky Header */}
       <header style={styles.header}>
         <div style={styles.headerInner}>
-          <div>
-            <div style={styles.headerTitle}>Therapy by Carole</div>
-            <div style={styles.headerSub}>
-              {programme?.name || `Hi ${firstName}`}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <svg width="28" height="28" viewBox="0 0 32 32" fill="none" style={{ flexShrink: 0 }}>
+              <circle cx="16" cy="16" r="15" stroke="#c47a5a" strokeWidth="2"/>
+              <path d="M10 16 Q16 8 22 16 Q16 24 10 16Z" fill="rgba(239,231,220,0.8)"/>
+            </svg>
+            <div>
+              <div style={styles.headerTitle}>Therapy by Carole</div>
+              <div style={styles.headerSub}>
+                {programme?.name || `Hi ${firstName}`}
+              </div>
             </div>
           </div>
           <button
