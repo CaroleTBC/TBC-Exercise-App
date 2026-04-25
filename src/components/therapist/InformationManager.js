@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import { Plus, Trash2, X, ChevronDown, ChevronUp, Search, Edit2 } from 'lucide-react';
+import { Plus, Trash2, X, ChevronDown, ChevronUp, Search, Edit2, Sparkles } from 'lucide-react';
 
 const CATEGORIES = ['General', 'Osteoporosis', 'Exercise Tips', 'Home Care', 'Nutrition', 'Lifestyle'];
 
@@ -44,9 +44,56 @@ export default function InformationManager() {
   const [filterClient, setFilterClient] = useState('');
   const [expandedId, setExpandedId] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [addPrefill, setAddPrefill] = useState(null);   // pre-filled data for new article (from AI)
   const [editingArticle, setEditingArticle] = useState(null);
+  const [showAiPanel, setShowAiPanel] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiClient, setAiClient] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
 
   useEffect(() => { fetchAll(); }, []);
+
+  async function generateWithAI() {
+    if (!aiPrompt.trim()) return;
+    setAiLoading(true);
+    try {
+      const selectedClient = clients.find(c => c.id === aiClient);
+      const response = await fetch(
+        `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/generate-information`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            prompt: aiPrompt,
+            client_name: selectedClient?.full_name || null,
+          }),
+        }
+      );
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Generation failed');
+      }
+      const data = await response.json();
+      const generated = data.article;
+      // Pre-fill the add modal with AI-generated content
+      setAddPrefill({
+        client_id: aiClient || '',
+        title: generated.title || '',
+        content: generated.content || '',
+        category: generated.category || 'General',
+        is_pinned: false,
+      });
+      setShowAiPanel(false);
+      setShowAdd(true);
+    } catch (err) {
+      alert('AI generation failed. Please try again or add the article manually.');
+    } finally {
+      setAiLoading(false);
+    }
+  }
 
   async function fetchAll() {
     setLoading(true);
@@ -117,10 +164,65 @@ export default function InformationManager() {
           <h1 style={styles.pageTitle}>Information Articles</h1>
           <p style={styles.pageSubtitle}>{articles.length} article{articles.length !== 1 ? 's' : ''} across {clients.length} client{clients.length !== 1 ? 's' : ''}</p>
         </div>
-        <button onClick={() => setShowAdd(true)} className="btn btn-primary">
-          <Plus size={15} /> Add Article
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button
+            onClick={() => setShowAiPanel(v => !v)}
+            className="btn"
+            style={styles.aiBtn}
+          >
+            <Sparkles size={15} /> AI Generate
+          </button>
+          <button onClick={() => { setAddPrefill(null); setShowAdd(true); }} className="btn btn-primary">
+            <Plus size={15} /> Add Article
+          </button>
+        </div>
       </div>
+
+      {/* AI Panel */}
+      {showAiPanel && (
+        <div style={styles.aiPanel} className="fade-in">
+          <div style={styles.aiPanelHeader}>
+            <Sparkles size={15} color="var(--terracotta)" />
+            <span style={styles.aiPanelTitle}>Generate an information article with AI</span>
+            <button onClick={() => setShowAiPanel(false)} className="btn btn-ghost" style={{ marginLeft: 'auto', padding: '0.25rem' }}>
+              <X size={15} />
+            </button>
+          </div>
+          <p style={styles.aiNote}>
+            Describe what you need — the AI will draft the article for you to review and edit before saving.
+          </p>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+            <select
+              className="form-select"
+              style={{ maxWidth: '200px' }}
+              value={aiClient}
+              onChange={e => setAiClient(e.target.value)}
+            >
+              <option value="">No specific client</option>
+              {clients.map(c => <option key={c.id} value={c.id}>{c.full_name}</option>)}
+            </select>
+          </div>
+          <div style={styles.aiInputRow}>
+            <input
+              type="text"
+              className="form-input"
+              value={aiPrompt}
+              onChange={e => setAiPrompt(e.target.value)}
+              placeholder="e.g. what to expect after a DEXA scan, hip fracture prevention tips, importance of calcium and vitamin D"
+              onKeyDown={e => e.key === 'Enter' && generateWithAI()}
+            />
+            <button
+              onClick={generateWithAI}
+              className="btn btn-secondary"
+              disabled={aiLoading || !aiPrompt.trim()}
+              style={{ flexShrink: 0 }}
+            >
+              {aiLoading ? <span className="spinner" style={{ width: '1rem', height: '1rem', borderWidth: '2px' }} /> : <Sparkles size={14} />}
+              {aiLoading ? 'Generating…' : 'Generate'}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div style={styles.filterBar}>
         <div style={styles.searchWrapper}>
@@ -199,13 +301,19 @@ export default function InformationManager() {
       )}
 
       {showAdd && (
-        <AddArticleModal clients={clients} onAdd={addArticle} onClose={() => setShowAdd(false)} />
+        <AddArticleModal
+          clients={clients}
+          initial={addPrefill}
+          onAdd={addArticle}
+          onClose={() => { setShowAdd(false); setAddPrefill(null); }}
+        />
       )}
 
       {editingArticle && (
         <AddArticleModal
           clients={clients}
           initial={editingArticle}
+          isEditMode
           onAdd={form => updateArticle(editingArticle.id, form)}
           onClose={() => setEditingArticle(null)}
         />
@@ -214,8 +322,8 @@ export default function InformationManager() {
   );
 }
 
-function AddArticleModal({ clients, onAdd, onClose, initial }) {
-  const isEdit = !!initial;
+function AddArticleModal({ clients, onAdd, onClose, initial, isEditMode }) {
+  const isEdit = !!isEditMode;
   const [form, setForm] = useState({
     client_id: initial?.client_id ?? '',
     title: initial?.title ?? '',
@@ -313,4 +421,10 @@ const styles = {
   articleDate: { fontSize: '0.72rem', color: 'var(--charcoal)', opacity: 0.4, whiteSpace: 'nowrap' },
   articlePreview: { padding: '0.5rem 1rem 1rem', fontSize: '0.875rem', color: 'var(--charcoal)', opacity: 0.7, lineHeight: 1.6, margin: 0 },
   articleBody: { padding: '0.5rem 1rem 1.25rem' },
+  aiBtn: { background: 'rgba(196,122,90,0.12)', color: 'var(--terracotta)', border: '1px solid rgba(196,122,90,0.25)', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.875rem' },
+  aiPanel: { background: 'var(--cream)', border: '1px solid var(--cream-dark)', borderRadius: 'var(--radius)', padding: '1.25rem', marginBottom: '1.5rem' },
+  aiPanelHeader: { display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' },
+  aiPanelTitle: { fontFamily: 'var(--font-serif)', fontSize: '1rem', color: 'var(--navy)' },
+  aiNote: { fontSize: '0.8rem', color: 'var(--charcoal)', opacity: 0.65, margin: '0 0 0.75rem' },
+  aiInputRow: { display: 'flex', gap: '0.75rem', flexWrap: 'wrap' },
 };
