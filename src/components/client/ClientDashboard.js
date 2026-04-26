@@ -8,13 +8,14 @@ import LogSessionModal from './LogSessionModal';
 import {
   LogOut, Dumbbell, BookOpen, BarChart2,
   ChevronDown, ChevronUp, Clock, RotateCcw,
-  Info, Calendar
+  Info, Calendar, MessageCircle, Send, CheckCircle2
 } from 'lucide-react';
 
 const TABS = [
   { id: 'exercises', label: 'Exercises', icon: Dumbbell },
   { id: 'information', label: 'Information', icon: BookOpen },
   { id: 'progress', label: 'Progress', icon: BarChart2 },
+  { id: 'messages', label: 'Messages', icon: MessageCircle },
 ];
 
 // Parses **bold** and *italic* inline markers into React elements
@@ -134,9 +135,14 @@ export default function ClientDashboard() {
   const [loggedSets, setLoggedSets] = useState({});   // { [peId]: number }
   const [todayLogId, setTodayLogId] = useState(null);
   const [logSaving, setLogSaving] = useState({});      // { [peId]: bool }
+  const [questions, setQuestions] = useState([]);
+  const [availability, setAvailability] = useState(null);
+  const [questionText, setQuestionText] = useState('');
+  const [questionSending, setQuestionSending] = useState(false);
 
   useEffect(() => {
     fetchProgramme();
+    fetchMessages();
   }, []);
 
   async function fetchProgramme() {
@@ -159,7 +165,7 @@ export default function ClientDashboard() {
       const [{ data: progExercises, error: exErr }, { data: info, error: infoErr }] = await Promise.all([
         supabase
           .from('programme_exercises')
-          .select('*, exercise:exercises(*)')
+          .select('*, exercise:exercises(id, name, description, category, video_url, video_type, default_sets, default_reps, default_hold_seconds, default_rest_seconds, ai_generated, created_at, updated_at)')
           .eq('programme_id', prog.id)
           .eq('is_active', true)
           .order('sort_order'),
@@ -201,6 +207,42 @@ export default function ClientDashboard() {
       setFetchError(err.message || 'Failed to load your programme.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function fetchMessages() {
+    const [{ data: qs }, { data: av }] = await Promise.all([
+      supabase
+        .from('client_questions')
+        .select('*')
+        .eq('client_id', profile.id)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('therapist_availability')
+        .select('*')
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    if (qs) setQuestions(qs);
+    if (av) setAvailability(av);
+  }
+
+  async function submitQuestion() {
+    if (!questionText.trim()) return;
+    setQuestionSending(true);
+    try {
+      const { data, error } = await supabase
+        .from('client_questions')
+        .insert({ client_id: profile.id, therapist_id: programme?.therapist_id || null, question: questionText.trim() })
+        .select()
+        .single();
+      if (error) throw error;
+      setQuestions(prev => [data, ...prev]);
+      setQuestionText('');
+    } catch {
+      alert('Could not send your message. Please try again.');
+    } finally {
+      setQuestionSending(false);
     }
   }
 
@@ -531,6 +573,88 @@ export default function ClientDashboard() {
           </div>
         )}
 
+        {/* ── MESSAGES ──────────────────────────────── */}
+        {activeTab === 'messages' && (
+          <div className="fade-in">
+            {/* Availability notice */}
+            {availability?.away_mode ? (
+              <div style={styles.awayNotice}>
+                <span style={{ fontSize: '1.1rem' }}>🌴</span>
+                <div>
+                  <p style={{ fontWeight: 600, marginBottom: '0.2rem' }}>Currently away</p>
+                  <p style={{ opacity: 0.85 }}>{availability.away_message || 'Carole is currently away and will reply on her return.'}</p>
+                  {availability.return_date && (
+                    <p style={{ marginTop: '0.25rem', fontSize: '0.8rem', opacity: 0.7 }}>
+                      Expected return: {new Date(availability.return_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div style={styles.availabilityNotice}>
+                <Clock size={14} style={{ flexShrink: 0 }} />
+                <p>Messages are checked once a day, Monday to Friday. Carole will reply as soon as possible.</p>
+              </div>
+            )}
+
+            {/* Question form */}
+            <div className="card" style={styles.messageForm}>
+              <label style={styles.messageLabel}>Ask Carole a question</label>
+              <textarea
+                className="form-textarea"
+                value={questionText}
+                onChange={e => setQuestionText(e.target.value)}
+                placeholder="Type your question here…"
+                rows={3}
+                style={{ marginBottom: '0.75rem' }}
+              />
+              <button
+                onClick={submitQuestion}
+                disabled={questionSending || !questionText.trim()}
+                className="btn btn-primary"
+                style={{ alignSelf: 'flex-end', gap: '0.4rem' }}
+              >
+                {questionSending
+                  ? <span className="spinner" style={{ width: '1rem', height: '1rem', borderWidth: '2px' }} />
+                  : <Send size={14} />}
+                {questionSending ? 'Sending…' : 'Send message'}
+              </button>
+            </div>
+
+            {/* Q&A history */}
+            {questions.length > 0 && (
+              <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <p style={styles.historyLabel}>Previous messages</p>
+                {questions.map(q => (
+                  <div key={q.id} className="card" style={styles.questionCard}>
+                    <div style={styles.questionRow}>
+                      <MessageCircle size={14} color="var(--navy)" style={{ flexShrink: 0, marginTop: '0.15rem' }} />
+                      <div style={{ flex: 1 }}>
+                        <p style={styles.questionText}>{q.question}</p>
+                        <p style={styles.questionDate}>{new Date(q.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                      </div>
+                    </div>
+                    {q.answer ? (
+                      <div style={styles.answerRow}>
+                        <CheckCircle2 size={14} color="var(--terracotta)" style={{ flexShrink: 0, marginTop: '0.15rem' }} />
+                        <div>
+                          <p style={styles.answerText}>{q.answer}</p>
+                          <p style={styles.questionDate}>{new Date(q.answered_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={styles.pendingRow}>
+                        <Clock size={13} style={{ flexShrink: 0 }} />
+                        <p>Awaiting reply</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── PROGRESS ──────────────────────────────── */}
         {activeTab === 'progress' && (
           <div className="fade-in">
@@ -613,4 +737,16 @@ const styles = {
   infoDate: { fontSize: '0.75rem', color: 'var(--charcoal)', opacity: 0.5, marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--cream-dark)' },
   progressCard: { overflow: 'hidden' },
   progressHeader: { padding: '1.25rem 1.25rem 0', borderBottom: '1px solid var(--cream-dark)', paddingBottom: '1rem', marginBottom: '0' },
+  availabilityNotice: { display: 'flex', alignItems: 'flex-start', gap: '0.5rem', background: 'rgba(47,69,111,0.06)', borderRadius: 'var(--radius-sm)', padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--navy)', lineHeight: 1.5, marginBottom: '1rem' },
+  awayNotice: { display: 'flex', alignItems: 'flex-start', gap: '0.75rem', background: 'rgba(196,122,90,0.1)', borderLeft: '3px solid var(--terracotta)', borderRadius: '0 var(--radius-sm) var(--radius-sm) 0', padding: '0.85rem 1rem', fontSize: '0.85rem', color: 'var(--charcoal)', lineHeight: 1.6, marginBottom: '1rem' },
+  messageForm: { padding: '1rem', display: 'flex', flexDirection: 'column' },
+  messageLabel: { fontSize: '0.8rem', fontWeight: 600, color: 'var(--navy)', marginBottom: '0.5rem', display: 'block' },
+  historyLabel: { fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--navy)', opacity: 0.5, fontWeight: 600 },
+  questionCard: { padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' },
+  questionRow: { display: 'flex', gap: '0.6rem', alignItems: 'flex-start' },
+  questionText: { fontSize: '0.9rem', color: 'var(--charcoal)', lineHeight: 1.5 },
+  questionDate: { fontSize: '0.72rem', color: 'var(--charcoal)', opacity: 0.45, marginTop: '0.25rem' },
+  answerRow: { display: 'flex', gap: '0.6rem', alignItems: 'flex-start', background: 'rgba(196,122,90,0.07)', borderRadius: 'var(--radius-sm)', padding: '0.65rem 0.75rem' },
+  answerText: { fontSize: '0.875rem', color: 'var(--charcoal)', lineHeight: 1.6 },
+  pendingRow: { display: 'flex', gap: '0.4rem', alignItems: 'center', fontSize: '0.78rem', color: 'var(--charcoal)', opacity: 0.45, fontStyle: 'italic' },
 };

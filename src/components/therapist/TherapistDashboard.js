@@ -5,7 +5,7 @@ import ExerciseLibrary from './ExerciseLibrary';
 import ClientManager from './ClientManager';
 import InformationManager from './InformationManager';
 import {
-  Users, BookOpen, LogOut, Activity, ChevronRight, FileText
+  Users, BookOpen, LogOut, Activity, ChevronRight, FileText, Palmtree, X
 } from 'lucide-react';
 
 const TABS = [
@@ -14,7 +14,7 @@ const TABS = [
   { id: 'information', label: 'Information', icon: FileText },
 ];
 
-function SidebarContent({ profile, stats, activeTab, onTabChange, signOut }) {
+function SidebarContent({ profile, stats, activeTab, onTabChange, signOut, availability, awayExpanded, setAwayExpanded, awayForm, setAwayForm, saveAvailability, awaySaving }) {
   return (
     <>
       <div style={styles.sidebarLogo}>
@@ -64,6 +64,66 @@ function SidebarContent({ profile, stats, activeTab, onTabChange, signOut }) {
         <div style={styles.statRow}><Activity size={13} /><span>{stats.activeProgrammes} active programmes</span></div>
       </div>
 
+      {/* Away mode */}
+      <div style={styles.awaySection}>
+        {availability?.away_mode ? (
+          <>
+            <div style={styles.awayActiveBanner}>
+              <span>🌴 Away mode on</span>
+              <button
+                onClick={() => saveAvailability(false)}
+                disabled={awaySaving}
+                style={{ background: 'none', border: 'none', color: 'var(--terracotta)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+              >
+                {awaySaving ? '…' : 'Turn off'}
+              </button>
+            </div>
+            {availability.return_date && (
+              <p style={{ fontSize: '0.72rem', color: 'rgba(239,231,220,0.5)', margin: '0.3rem 0 0', paddingLeft: '0.25rem' }}>
+                Returning {new Date(availability.return_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+              </p>
+            )}
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => setAwayExpanded(v => !v)}
+              style={styles.awayToggleBtn}
+            >
+              <Palmtree size={14} />
+              {awayExpanded ? 'Cancel' : 'Set away message'}
+            </button>
+            {awayExpanded && (
+              <div style={styles.awayForm}>
+                <textarea
+                  placeholder="e.g. I'm on annual leave and will reply on my return."
+                  value={awayForm.away_message}
+                  onChange={e => setAwayForm(f => ({ ...f, away_message: e.target.value }))}
+                  rows={3}
+                  style={styles.awayTextarea}
+                />
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <input
+                    type="date"
+                    value={awayForm.return_date}
+                    onChange={e => setAwayForm(f => ({ ...f, return_date: e.target.value }))}
+                    style={{ ...styles.awayTextarea, flex: 1 }}
+                  />
+                  <button
+                    onClick={() => saveAvailability(true)}
+                    disabled={awaySaving}
+                    className="btn btn-primary"
+                    style={{ fontSize: '0.75rem', padding: '0.4rem 0.75rem', whiteSpace: 'nowrap' }}
+                  >
+                    {awaySaving ? '…' : 'Go away 🌴'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
       <button onClick={signOut} className="btn btn-ghost" style={styles.signOutBtn}>
         <LogOut size={15} /> Sign out
       </button>
@@ -76,10 +136,52 @@ export default function TherapistDashboard() {
   const [activeTab, setActiveTab] = useState('clients');
   const [stats, setStats] = useState({ clients: 0, exercises: 0, activeProgrammes: 0 });
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [availability, setAvailability] = useState(null);
+  const [awayExpanded, setAwayExpanded] = useState(false);
+  const [awayForm, setAwayForm] = useState({ away_message: '', return_date: '' });
+  const [awaySaving, setAwaySaving] = useState(false);
 
   useEffect(() => {
     fetchStats();
+    fetchAvailability();
   }, []);
+
+  async function fetchAvailability() {
+    const { data } = await supabase
+      .from('therapist_availability')
+      .select('*')
+      .eq('therapist_id', profile.id)
+      .maybeSingle();
+    if (data) {
+      setAvailability(data);
+      setAwayForm({ away_message: data.away_message || '', return_date: data.return_date || '' });
+    }
+  }
+
+  async function saveAvailability(away_mode) {
+    setAwaySaving(true);
+    try {
+      const payload = {
+        therapist_id: profile.id,
+        away_mode,
+        away_message: awayForm.away_message || null,
+        return_date: awayForm.return_date || null,
+        updated_at: new Date().toISOString(),
+      };
+      const { data, error } = await supabase
+        .from('therapist_availability')
+        .upsert(payload, { onConflict: 'therapist_id' })
+        .select()
+        .single();
+      if (error) throw error;
+      setAvailability(data);
+      if (!away_mode) setAwayExpanded(false);
+    } catch {
+      alert('Failed to save availability. Please try again.');
+    } finally {
+      setAwaySaving(false);
+    }
+  }
 
   async function fetchStats() {
     try {
@@ -103,14 +205,14 @@ export default function TherapistDashboard() {
     <div style={styles.layout}>
       {/* Desktop Sidebar */}
       <aside className="th-sidebar" style={{ display: 'flex', flexDirection: 'column' }}>
-        <SidebarContent profile={profile} stats={stats} activeTab={activeTab} onTabChange={handleTabChange} signOut={signOut} />
+        <SidebarContent profile={profile} stats={stats} activeTab={activeTab} onTabChange={handleTabChange} signOut={signOut} availability={availability} awayExpanded={awayExpanded} setAwayExpanded={setAwayExpanded} awayForm={awayForm} setAwayForm={setAwayForm} saveAvailability={saveAvailability} awaySaving={awaySaving} />
       </aside>
 
       {/* Mobile overlay sidebar */}
       {sidebarOpen && (
         <div style={styles.mobileOverlay} onClick={() => setSidebarOpen(false)}>
           <div style={styles.mobileSidebar} onClick={e => e.stopPropagation()}>
-            <SidebarContent profile={profile} stats={stats} activeTab={activeTab} onTabChange={handleTabChange} signOut={signOut} />
+            <SidebarContent profile={profile} stats={stats} activeTab={activeTab} onTabChange={handleTabChange} signOut={signOut} availability={availability} awayExpanded={awayExpanded} setAwayExpanded={setAwayExpanded} awayForm={awayForm} setAwayForm={setAwayForm} saveAvailability={saveAvailability} awaySaving={awaySaving} />
           </div>
         </div>
       )}
@@ -294,12 +396,58 @@ const styles = {
   },
   signOutBtn: {
     color: 'rgba(239,231,220,0.45)',
-    marginTop: '1rem',
+    marginTop: '0.5rem',
     justifyContent: 'flex-start',
     gap: '0.6rem',
     padding: '0.5rem 0.25rem',
     width: '100%',
     fontSize: '0.85rem',
+  },
+  awaySection: {
+    marginTop: 'auto',
+    paddingTop: '1rem',
+    borderTop: '1px solid rgba(239,231,220,0.1)',
+  },
+  awayActiveBanner: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    background: 'rgba(196,122,90,0.2)',
+    borderRadius: '6px',
+    padding: '0.5rem 0.75rem',
+    fontSize: '0.8rem',
+    color: 'var(--cream)',
+    fontWeight: 600,
+  },
+  awayToggleBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+    background: 'none',
+    border: '1px solid rgba(239,231,220,0.2)',
+    borderRadius: '6px',
+    color: 'rgba(239,231,220,0.55)',
+    cursor: 'pointer',
+    fontSize: '0.78rem',
+    padding: '0.4rem 0.75rem',
+    width: '100%',
+  },
+  awayForm: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.5rem',
+    marginTop: '0.5rem',
+  },
+  awayTextarea: {
+    background: 'rgba(255,255,255,0.07)',
+    border: '1px solid rgba(239,231,220,0.2)',
+    borderRadius: '6px',
+    color: 'var(--cream)',
+    fontSize: '0.8rem',
+    padding: '0.5rem 0.65rem',
+    fontFamily: 'inherit',
+    resize: 'vertical',
+    width: '100%',
   },
   mainWrapper: {
     flex: 1,

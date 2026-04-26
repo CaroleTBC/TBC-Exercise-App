@@ -5,7 +5,7 @@ import ComplianceTracker from '../client/ComplianceTracker';
 import {
   UserPlus, X, ChevronRight, Plus, Trash2,
   Save, Eye, CheckCircle2, Circle, BarChart2, BookOpen,
-  AlertCircle, Search
+  AlertCircle, Search, MessageCircle, Send, Clock
 } from 'lucide-react';
 
 export default function ClientManager({ onStatsChange }) {
@@ -155,10 +155,16 @@ function ClientDetail({ client, therapistId, onBack, activeTab, setActiveTab }) 
   const [showAddExercise, setShowAddExercise] = useState(false);
   const [showAddInfo, setShowAddInfo] = useState(false);
 
+  const [questions, setQuestions] = useState([]);
+  const [unansweredCount, setUnansweredCount] = useState(0);
+  const [replyDraft, setReplyDraft] = useState({});   // { [questionId]: string }
+  const [replySaving, setReplySaving] = useState({}); // { [questionId]: bool }
+
   const CLIENT_TABS = [
     { id: 'programme', label: 'Programme', icon: CheckCircle2 },
     { id: 'information', label: 'Information', icon: BookOpen },
     { id: 'compliance', label: 'Compliance', icon: BarChart2 },
+    { id: 'questions', label: 'Questions', icon: MessageCircle },
   ];
 
   useEffect(() => {
@@ -220,10 +226,42 @@ function ClientDetail({ client, therapistId, onBack, activeTab, setActiveTab }) 
       setProgrammeExercises(progExs || []);
       setAllExercises(exLib || []);
       setInformation(info || []);
+
+      const { data: qs } = await supabase
+        .from('client_questions')
+        .select('*')
+        .eq('client_id', client.id)
+        .order('created_at', { ascending: false });
+      if (qs) {
+        setQuestions(qs);
+        setUnansweredCount(qs.filter(q => !q.answer).length);
+      }
     } catch (err) {
       setError(err.message || 'Failed to load client data.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function replyToQuestion(questionId) {
+    const answer = replyDraft[questionId]?.trim();
+    if (!answer) return;
+    setReplySaving(prev => ({ ...prev, [questionId]: true }));
+    try {
+      const { data, error } = await supabase
+        .from('client_questions')
+        .update({ answer, answered_at: new Date().toISOString() })
+        .eq('id', questionId)
+        .select()
+        .single();
+      if (error) throw error;
+      setQuestions(prev => prev.map(q => q.id === questionId ? data : q));
+      setUnansweredCount(prev => Math.max(0, prev - 1));
+      setReplyDraft(prev => { const n = { ...prev }; delete n[questionId]; return n; });
+    } catch {
+      alert('Failed to save reply. Please try again.');
+    } finally {
+      setReplySaving(prev => ({ ...prev, [questionId]: false }));
     }
   }
 
@@ -328,6 +366,9 @@ function ClientDetail({ client, therapistId, onBack, activeTab, setActiveTab }) 
             >
               <Icon size={14} />
               {tab.label}
+              {tab.id === 'questions' && unansweredCount > 0 && (
+                <span style={styles.qBadge}>{unansweredCount}</span>
+              )}
             </button>
           );
         })}
@@ -433,6 +474,73 @@ function ClientDetail({ client, therapistId, onBack, activeTab, setActiveTab }) 
         </div>
       )}
 
+      {activeTab === 'questions' && (
+        <div style={styles.tabContent} className="fade-in">
+          {questions.length === 0 ? (
+            <div className="empty-state">
+              <MessageCircle size={36} opacity={0.3} />
+              <p>No messages from {client.full_name.split(' ')[0]} yet.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {questions.map(q => (
+                <div key={q.id} className="card" style={{ padding: '1rem' }}>
+                  {/* Question */}
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                    <MessageCircle size={14} color="var(--navy)" style={{ flexShrink: 0, marginTop: '0.15rem' }} />
+                    <div>
+                      <p style={{ fontSize: '0.9rem', color: 'var(--charcoal)', lineHeight: 1.5 }}>{q.question}</p>
+                      <p style={{ fontSize: '0.72rem', color: 'var(--charcoal)', opacity: 0.45, marginTop: '0.2rem' }}>
+                        {new Date(q.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Existing answer */}
+                  {q.answer ? (
+                    <div style={styles.answerBlock}>
+                      <CheckCircle2 size={13} color="var(--success)" style={{ flexShrink: 0, marginTop: '0.15rem' }} />
+                      <div>
+                        <p style={{ fontSize: '0.875rem', color: 'var(--charcoal)', lineHeight: 1.6 }}>{q.answer}</p>
+                        <p style={{ fontSize: '0.72rem', color: 'var(--charcoal)', opacity: 0.45, marginTop: '0.2rem' }}>
+                          Replied {new Date(q.answered_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Reply form */
+                    <div style={styles.replyForm}>
+                      <div style={styles.pendingLabel}>
+                        <Clock size={12} /> Awaiting your reply
+                      </div>
+                      <textarea
+                        className="form-textarea"
+                        rows={3}
+                        placeholder="Type your reply…"
+                        value={replyDraft[q.id] || ''}
+                        onChange={e => setReplyDraft(prev => ({ ...prev, [q.id]: e.target.value }))}
+                        style={{ marginBottom: '0.5rem' }}
+                      />
+                      <button
+                        className="btn btn-primary"
+                        style={{ alignSelf: 'flex-end', fontSize: '0.82rem', padding: '0.45rem 0.9rem', gap: '0.35rem' }}
+                        disabled={replySaving[q.id] || !replyDraft[q.id]?.trim()}
+                        onClick={() => replyToQuestion(q.id)}
+                      >
+                        {replySaving[q.id]
+                          ? <span className="spinner" style={{ width: '0.9rem', height: '0.9rem', borderWidth: '2px' }} />
+                          : <Send size={13} />}
+                        Send reply
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {showAddExercise && (
         <AddExerciseModal
           allExercises={allExercises}
@@ -459,6 +567,7 @@ function ProgrammeExerciseRow({ pe, idx, onRemove, onUpdate }) {
     reps: pe.reps ?? pe.exercise?.default_reps ?? '',
     hold_seconds: pe.hold_seconds ?? pe.exercise?.default_hold_seconds ?? '',
     rest_seconds: pe.rest_seconds ?? pe.exercise?.default_rest_seconds ?? '',
+    therapist_notes: pe.therapist_notes ?? '',
     client_notes: pe.client_notes ?? '',
     frequency_per_week: pe.frequency_per_week ?? '',
   });
@@ -469,6 +578,7 @@ function ProgrammeExerciseRow({ pe, idx, onRemove, onUpdate }) {
       reps: form.reps || null,
       hold_seconds: form.hold_seconds !== '' ? +form.hold_seconds : null,
       rest_seconds: form.rest_seconds !== '' ? +form.rest_seconds : null,
+      therapist_notes: form.therapist_notes || null,
       client_notes: form.client_notes || null,
       frequency_per_week: form.frequency_per_week !== '' ? +form.frequency_per_week : null,
     });
@@ -544,13 +654,23 @@ function ProgrammeExerciseRow({ pe, idx, onRemove, onUpdate }) {
             </select>
           </div>
           <div className="form-group" style={{ marginBottom: '0.75rem', marginTop: '0.75rem' }}>
-            <label className="form-label" style={{ fontSize: '0.7rem' }}>Client-specific notes</label>
+            <label className="form-label" style={{ fontSize: '0.7rem' }}>Your private notes <span style={{ color: 'var(--charcoal)', opacity: 0.5, fontWeight: 400 }}>(only you can see this)</span></label>
+            <textarea
+              className="form-textarea"
+              style={{ minHeight: '60px', padding: '0.45rem 0.65rem' }}
+              value={form.therapist_notes}
+              onChange={e => setForm(f => ({ ...f, therapist_notes: e.target.value }))}
+              placeholder="Clinical notes, precautions, progressions for your reference..."
+            />
+          </div>
+          <div className="form-group" style={{ marginBottom: '0.75rem' }}>
+            <label className="form-label" style={{ fontSize: '0.7rem' }}>Note for client <span style={{ color: 'var(--terracotta)', fontWeight: 400 }}>(client will see this)</span></label>
             <textarea
               className="form-textarea"
               style={{ minHeight: '60px', padding: '0.45rem 0.65rem' }}
               value={form.client_notes}
               onChange={e => setForm(f => ({ ...f, client_notes: e.target.value }))}
-              placeholder="Custom instruction for this client..."
+              placeholder="Optional instruction to share with client..."
             />
           </div>
           <button onClick={save} className="btn btn-primary" style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}>
@@ -566,7 +686,7 @@ function AddExerciseModal({ allExercises, assignedIds, onAdd, onClose }) {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(null);
   const [customisation, setCustomisation] = useState({
-    sets: '', reps: '', hold_seconds: '', rest_seconds: '', client_notes: '', frequency_per_week: '',
+    sets: '', reps: '', hold_seconds: '', rest_seconds: '', therapist_notes: '', client_notes: '', frequency_per_week: '',
   });
 
   const available = allExercises
@@ -581,6 +701,7 @@ function AddExerciseModal({ allExercises, assignedIds, onAdd, onClose }) {
     if (customisation.reps) payload.reps = customisation.reps;
     if (customisation.hold_seconds) payload.hold_seconds = +customisation.hold_seconds;
     if (customisation.rest_seconds) payload.rest_seconds = +customisation.rest_seconds;
+    if (customisation.therapist_notes) payload.therapist_notes = customisation.therapist_notes;
     if (customisation.client_notes) payload.client_notes = customisation.client_notes;
     if (customisation.frequency_per_week) payload.frequency_per_week = +customisation.frequency_per_week;
     onAdd(selected.id, payload);
@@ -675,11 +796,21 @@ function AddExerciseModal({ allExercises, assignedIds, onAdd, onClose }) {
                 </select>
               </div>
               <div className="form-group" style={{ marginTop: '0.75rem' }}>
-                <label className="form-label" style={{ fontSize: '0.7rem' }}>Client-specific note</label>
+                <label className="form-label" style={{ fontSize: '0.7rem' }}>Your private notes <span style={{ color: 'var(--charcoal)', opacity: 0.5, fontWeight: 400 }}>(only you can see this)</span></label>
                 <textarea
                   className="form-textarea"
                   style={{ minHeight: '60px' }}
-                  placeholder="Any note specific to this client..."
+                  placeholder="Clinical notes, precautions, progressions for your reference..."
+                  value={customisation.therapist_notes}
+                  onChange={e => setCustomisation(c => ({ ...c, therapist_notes: e.target.value }))}
+                />
+              </div>
+              <div className="form-group" style={{ marginTop: '0.75rem' }}>
+                <label className="form-label" style={{ fontSize: '0.7rem' }}>Note for client <span style={{ color: 'var(--terracotta)', fontWeight: 400 }}>(client will see this)</span></label>
+                <textarea
+                  className="form-textarea"
+                  style={{ minHeight: '60px' }}
+                  placeholder="Optional instruction to share with client..."
                   value={customisation.client_notes}
                   onChange={e => setCustomisation(c => ({ ...c, client_notes: e.target.value }))}
                 />
@@ -882,4 +1013,8 @@ const styles = {
   peEditForm: { padding: '0 1rem 1rem', borderTop: '1px solid var(--cream-dark)' },
   infoCategory: { fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--terracotta)', fontWeight: 600 },
   pinnedBar: { background: 'var(--cream)', padding: '0.35rem 1rem', fontSize: '0.75rem', color: 'var(--navy)', borderBottom: '1px solid var(--cream-dark)' },
+  qBadge: { background: 'var(--terracotta)', color: 'white', borderRadius: '20px', fontSize: '0.65rem', fontWeight: 700, padding: '0.05rem 0.45rem', lineHeight: 1.4, marginLeft: '0.2rem' },
+  answerBlock: { display: 'flex', gap: '0.5rem', alignItems: 'flex-start', background: 'rgba(76,175,125,0.08)', borderRadius: 'var(--radius-sm)', padding: '0.65rem 0.75rem' },
+  replyForm: { display: 'flex', flexDirection: 'column', gap: '0.5rem', borderTop: '1px solid var(--cream-dark)', paddingTop: '0.75rem' },
+  pendingLabel: { display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem', color: 'var(--terracotta)', fontWeight: 600 },
 };

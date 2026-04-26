@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import VideoPlayer from '../shared/VideoPlayer';
 import {
   Plus, Sparkles, Search, ChevronDown, ChevronUp,
-  Edit2, Trash2, X, Save, Info
+  Edit2, Trash2, X, Save, Info, AlertTriangle
 } from 'lucide-react';
 
 export default function ExerciseLibrary({ onStatsChange }) {
@@ -130,6 +130,7 @@ export default function ExerciseLibrary({ onStatsChange }) {
       name: '',
       category: EXERCISE_CATEGORIES[0],
       description: '',
+      safety_notes: '',
       video_url: '',
       video_type: 'youtube',
       default_sets: 3,
@@ -340,8 +341,14 @@ export default function ExerciseLibrary({ onStatsChange }) {
                             {ex.default_hold_seconds && <span className="badge badge-navy">Hold: {ex.default_hold_seconds}s</span>}
                             {ex.default_rest_seconds && <span className="badge badge-navy">Rest: {ex.default_rest_seconds}s</span>}
                           </div>
+                          {ex.safety_notes && (
+                            <div style={styles.safetyNotes}>
+                              <AlertTriangle size={13} style={{ flexShrink: 0, marginTop: '0.1rem' }} />
+                              <span>{ex.safety_notes}</span>
+                            </div>
+                          )}
                           {ex.therapist_notes_template && (
-                            <div style={styles.therapistNotes}>
+                            <div style={{ ...styles.therapistNotes, marginTop: ex.safety_notes ? '0.5rem' : 0 }}>
                               <Info size={13} />
                               <span>{ex.therapist_notes_template}</span>
                             </div>
@@ -426,15 +433,19 @@ function ExerciseFormModal({ exercise, onSave, onClose }) {
 
             <div className="form-group">
               <label className="form-label">Category *</label>
-              <select
-                className="form-select"
+              <input
+                type="text"
+                className="form-input"
+                list="exercise-category-list"
                 value={form.category}
                 onChange={e => set('category', e.target.value)}
-              >
+                placeholder="Select or type a new category..."
+              />
+              <datalist id="exercise-category-list">
                 {EXERCISE_CATEGORIES.map(c => (
-                  <option key={c} value={c}>{c}</option>
+                  <option key={c} value={c} />
                 ))}
-              </select>
+              </datalist>
             </div>
 
             <div className="form-group">
@@ -474,6 +485,20 @@ function ExerciseFormModal({ exercise, onSave, onClose }) {
               onChange={e => set('description', e.target.value)}
               rows={5}
               placeholder="Step-by-step instructions including starting position, movement, and key technique points..."
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <AlertTriangle size={13} color="#d97706" /> Safety Notes
+            </label>
+            <textarea
+              className="form-textarea"
+              value={form.safety_notes || ''}
+              onChange={e => set('safety_notes', e.target.value)}
+              rows={3}
+              placeholder="Contraindications, precautions, or safety warnings relevant to this exercise..."
+              style={{ borderColor: form.safety_notes ? '#d97706' : undefined }}
             />
           </div>
 
@@ -721,6 +746,19 @@ const styles = {
     gap: '0.4rem',
     flexWrap: 'wrap',
     marginBottom: '0.75rem',
+  },
+  safetyNotes: {
+    display: 'flex',
+    gap: '0.5rem',
+    alignItems: 'flex-start',
+    background: 'rgba(217,119,6,0.08)',
+    borderLeft: '3px solid #d97706',
+    borderRadius: '0 var(--radius-sm) var(--radius-sm) 0',
+    padding: '0.65rem 0.75rem',
+    fontSize: '0.8rem',
+    color: '#92400e',
+    lineHeight: 1.6,
+    marginTop: '0.75rem',
   },
   therapistNotes: {
     display: 'flex',
