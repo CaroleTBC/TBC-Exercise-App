@@ -9,3 +9,7 @@
 
 [build.environment]
   NODE_VERSION = "18"
+
+[context.develop]
+  command = "npm run build"
+  publish = "build"
