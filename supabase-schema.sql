@@ -7,6 +7,16 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ─────────────────────────────────────────────
+-- CLIENT Q&A MESSAGES
+-- ─────────────────────────────────────────────
+-- CREATE TABLE client_questions (see migration: add_client_questions_and_therapist_availability)
+
+-- ─────────────────────────────────────────────
+-- THERAPIST AVAILABILITY / AWAY MODE
+-- ─────────────────────────────────────────────
+-- CREATE TABLE therapist_availability (see migration: add_client_questions_and_therapist_availability)
+
+-- ─────────────────────────────────────────────
 -- PROFILES (extends Supabase auth.users)
 -- ─────────────────────────────────────────────
 CREATE TABLE profiles (
@@ -36,6 +46,7 @@ CREATE TABLE exercises (
   default_reps TEXT DEFAULT '10',
   default_hold_seconds INTEGER,
   default_rest_seconds INTEGER DEFAULT 60,
+  safety_notes TEXT,
   therapist_notes_template TEXT,
   ai_generated BOOLEAN DEFAULT false,
   created_by UUID REFERENCES profiles(id),
@@ -70,6 +81,7 @@ CREATE TABLE programme_exercises (
   reps TEXT,
   hold_seconds INTEGER,
   rest_seconds INTEGER,
+  therapist_notes TEXT,
   client_notes TEXT,
   sort_order INTEGER DEFAULT 0,
   is_active BOOLEAN DEFAULT true,
@@ -117,7 +129,8 @@ CREATE TABLE exercise_completions (
   completed BOOLEAN DEFAULT false,
   difficulty_rating INTEGER CHECK (difficulty_rating BETWEEN 1 AND 5),
   notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(compliance_log_id, programme_exercise_id)
 );
 
 -- ─────────────────────────────────────────────

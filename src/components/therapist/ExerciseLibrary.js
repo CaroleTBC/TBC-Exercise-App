@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { supabase, EXERCISE_CATEGORIES, CATEGORY_LABELS } from '../../lib/supabase';import { useAuth } from '../../hooks/useAuth';
+import { supabase, EXERCISE_CATEGORIES, CATEGORY_LABELS } from '../../lib/supabase';
+import { useAuth } from '../../hooks/useAuth';
 import VideoPlayer from '../shared/VideoPlayer';
 import {
   Plus, Sparkles, Search, ChevronDown, ChevronUp,
-  Edit2, Trash2, X, Save, Check, Info
+  Edit2, Trash2, X, Save, Info, AlertTriangle
 } from 'lucide-react';
 
 export default function ExerciseLibrary({ onStatsChange }) {
@@ -24,15 +25,26 @@ export default function ExerciseLibrary({ onStatsChange }) {
   }, []);
 
   async function fetchExercises() {
-    const { data } = await supabase
-      .from('exercises')
-      .select('*')
-      .order('name');
-    setExercises(data || []);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase
+        .from('exercises')
+        .select('*')
+        .order('name');
+      if (error) throw error;
+      setExercises(data || []);
+    } catch (err) {
+      console.error('Failed to load exercises:', err);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  const categories = ['All', ...EXERCISE_CATEGORIES];
+  const categories = useMemo(() => {
+    const seen = new Set(exercises.map(ex => ex.category).filter(Boolean));
+    const ordered = EXERCISE_CATEGORIES.filter(c => seen.has(c));
+    const extras = [...seen].filter(c => !EXERCISE_CATEGORIES.includes(c)).sort();
+    return ['All', ...ordered, ...extras];
+  }, [exercises]);
 
   const filtered = useMemo(() => {
     return exercises
@@ -50,54 +62,53 @@ export default function ExerciseLibrary({ onStatsChange }) {
   const grouped = useMemo(() => {
     if (activeCategory !== 'All') return { [activeCategory]: filtered };
     const g = {};
+    // Add exercises in predefined category order first
     EXERCISE_CATEGORIES.forEach(cat => {
       const catExercises = filtered.filter(ex => ex.category === cat);
       if (catExercises.length > 0) g[cat] = catExercises;
+    });
+    // Catch any exercises whose category doesn't match a predefined one
+    const known = new Set(EXERCISE_CATEGORIES);
+    filtered.filter(ex => !known.has(ex.category)).forEach(ex => {
+      const cat = ex.category || 'Other';
+      if (!g[cat]) g[cat] = [];
+      g[cat].push(ex);
     });
     return g;
   }, [filtered, activeCategory]);
 
   async function handleDelete(id) {
     if (!window.confirm('Delete this exercise from the library?')) return;
-    await supabase.from('exercises').delete().eq('id', id);
+    const { error } = await supabase.from('exercises').delete().eq('id', id);
+    if (error) { alert('Failed to delete exercise. Please try again.'); return; }
     setExercises(prev => prev.filter(e => e.id !== id));
     onStatsChange?.();
   }
 
-  async function generateWithAI() {
+ async function generateWithAI() {
     if (!aiPrompt.trim()) return;
     setAiLoading(true);
 
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          messages: [{
-            role: 'user',
-            content: `You are an expert in strength and conditioning, specialising in exercises for people with osteoporosis, bone health, and general rehabilitation. Generate an exercise based on this request: "${aiPrompt}"
+      const response = await fetch(
+        `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/generate-exercise`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ prompt: aiPrompt }),
+        }
+      );
 
-Return ONLY valid JSON in this exact format, no other text:
-{
-  "name": "Exercise Name",
-  "category": "one of: strength, impact, spinal, balance",
-  "description": "Clear step-by-step instructions. Include starting position, movement, key technique points, and any safety cues for someone with osteoporosis.",
-  "default_sets": 3,
-  "default_reps": "10",
-  "default_hold_seconds": null,
-  "default_rest_seconds": 60,
-  "therapist_notes_template": "A brief note for the therapist about progressions, regressions, or contraindications."
-}`
-          }]
-        })
-      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Generation failed');
+      }
 
       const data = await response.json();
-      const text = data.content?.[0]?.text || '';
-      const clean = text.replace(/```json|```/g, '').trim();
-      const generated = JSON.parse(clean);
+      const generated = data.exercise;
 
       setEditingExercise({
         ...generated,
@@ -119,6 +130,7 @@ Return ONLY valid JSON in this exact format, no other text:
       name: '',
       category: EXERCISE_CATEGORIES[0],
       description: '',
+      safety_notes: '',
       video_url: '',
       video_type: 'youtube',
       default_sets: 3,
@@ -141,19 +153,21 @@ Return ONLY valid JSON in this exact format, no other text:
     delete payload.id;
 
     if (exercise.id) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('exercises')
         .update(payload)
         .eq('id', exercise.id)
         .select()
         .single();
+      if (error) throw error;
       setExercises(prev => prev.map(e => e.id === exercise.id ? data : e));
     } else {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('exercises')
         .insert(payload)
         .select()
         .single();
+      if (error) throw error;
       setExercises(prev => [...prev, data]);
     }
 
@@ -327,8 +341,14 @@ Return ONLY valid JSON in this exact format, no other text:
                             {ex.default_hold_seconds && <span className="badge badge-navy">Hold: {ex.default_hold_seconds}s</span>}
                             {ex.default_rest_seconds && <span className="badge badge-navy">Rest: {ex.default_rest_seconds}s</span>}
                           </div>
+                          {ex.safety_notes && (
+                            <div style={styles.safetyNotes}>
+                              <AlertTriangle size={13} style={{ flexShrink: 0, marginTop: '0.1rem' }} />
+                              <span>{ex.safety_notes}</span>
+                            </div>
+                          )}
                           {ex.therapist_notes_template && (
-                            <div style={styles.therapistNotes}>
+                            <div style={{ ...styles.therapistNotes, marginTop: ex.safety_notes ? '0.5rem' : 0 }}>
                               <Info size={13} />
                               <span>{ex.therapist_notes_template}</span>
                             </div>
@@ -370,8 +390,13 @@ function ExerciseFormModal({ exercise, onSave, onClose }) {
       return;
     }
     setSaving(true);
-    await onSave(form);
-    setSaving(false);
+    try {
+      await onSave(form);
+    } catch (err) {
+      alert(err.message || 'Failed to save exercise. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -408,15 +433,19 @@ function ExerciseFormModal({ exercise, onSave, onClose }) {
 
             <div className="form-group">
               <label className="form-label">Category *</label>
-              <select
-                className="form-select"
+              <input
+                type="text"
+                className="form-input"
+                list="exercise-category-list"
                 value={form.category}
                 onChange={e => set('category', e.target.value)}
-              >
+                placeholder="Select or type a new category..."
+              />
+              <datalist id="exercise-category-list">
                 {EXERCISE_CATEGORIES.map(c => (
-                  <option key={c} value={c}>{c}</option>
+                  <option key={c} value={c} />
                 ))}
-              </select>
+              </datalist>
             </div>
 
             <div className="form-group">
@@ -456,6 +485,20 @@ function ExerciseFormModal({ exercise, onSave, onClose }) {
               onChange={e => set('description', e.target.value)}
               rows={5}
               placeholder="Step-by-step instructions including starting position, movement, and key technique points..."
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <AlertTriangle size={13} color="#d97706" /> Safety Notes
+            </label>
+            <textarea
+              className="form-textarea"
+              value={form.safety_notes || ''}
+              onChange={e => set('safety_notes', e.target.value)}
+              rows={3}
+              placeholder="Contraindications, precautions, or safety warnings relevant to this exercise..."
+              style={{ borderColor: form.safety_notes ? '#d97706' : undefined }}
             />
           </div>
 
@@ -703,6 +746,19 @@ const styles = {
     gap: '0.4rem',
     flexWrap: 'wrap',
     marginBottom: '0.75rem',
+  },
+  safetyNotes: {
+    display: 'flex',
+    gap: '0.5rem',
+    alignItems: 'flex-start',
+    background: 'rgba(217,119,6,0.08)',
+    borderLeft: '3px solid #d97706',
+    borderRadius: '0 var(--radius-sm) var(--radius-sm) 0',
+    padding: '0.65rem 0.75rem',
+    fontSize: '0.8rem',
+    color: '#92400e',
+    lineHeight: 1.6,
+    marginTop: '0.75rem',
   },
   therapistNotes: {
     display: 'flex',
